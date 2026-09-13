@@ -1,7 +1,7 @@
 window.SF=window.SF||{};
 (()=>{'use strict';
 const S=window.SF;
-S.DB='sf-preventivi-v4';S.PROJECTS='projects';S.ASSETS='assets';S.SETTINGS='settings';
+S.DB='sf-preventivi-v3';S.PROJECTS='projects';S.ASSETS='assets';S.SETTINGS='settings';
 S.uuid=()=>crypto.randomUUID();
 S.num=v=>Number(v)||0;
 S.round=n=>Math.round((S.num(n)+Number.EPSILON)*100)/100;
@@ -55,7 +55,7 @@ function intWords(n){
 }
 S.moneyWords=n=>{
   const centsTotal=Math.round(S.num(n)*100),euros=Math.floor(centsTotal/100),cents=centsTotal%100;
-  let out=`${intWords(euros)} ${euros===1?'euro':'euro'}`;
+  let out=`${intWords(euros)} euro`;
   if(cents)out+=` e ${intWords(cents)} ${cents===1?'centesimo':'centesimi'}`;
   return out;
 };
