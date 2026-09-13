@@ -1,8 +1,12 @@
 window.SF=window.SF||{};
 (()=>{'use strict';
-const S=window.SF;const {PDFDocument,StandardFonts,rgb}=window.PDFLib||{};
+const S=window.SF;
+const {PDFDocument,StandardFonts,rgb,PDFName,PDFDict,PDFRawStream,pushGraphicsState,popGraphicsState,moveTo,lineTo,closePath,clip,endPath}=window.PDFLib||{};
 const PAGE=[595.28,841.89],sage=rgb(.49,.57,.41),dark=rgb(.20,.24,.18),paper=rgb(.995,.989,.97),white=rgb(1,1,1);
-const REF_W=595.5,REF_H=842.25,patchColors=new WeakMap();
+const REF_W=595.5,REF_H=842.25;
+const FONT_ITALIC='https://cdn.jsdelivr.net/fontsource/fonts/ibm-plex-sans-condensed@5.3.0/latin-400-italic.woff';
+const FONT_REGULAR='https://cdn.jsdelivr.net/fontsource/fonts/ibm-plex-sans-condensed@5.3.0/latin-400-normal.woff';
+
 S.generatePdf=async p=>{
   if(!window.PDFLib)throw new Error('Motore PDF non disponibile. Ricarica la pagina con connessione attiva.');
   p=S.migrateProject(p);const t=S.calc(p),out=await PDFDocument.create(),font=await out.embedFont(StandardFonts.TimesRoman),bold=await out.embedFont(StandardFonts.TimesRomanBold);
@@ -26,40 +30,69 @@ async function pricing(out,p,t,font,bold){const pg=basePage(out);center(pg,'PREV
 
 async function appendOriginalContract(out,src,p,t){
   const copied=await out.copyPages(src,[12,13,14,15,16,17,18,19,20]);for(const pg of copied)out.addPage(pg);
-  const italic=await out.embedFont(StandardFonts.HelveticaOblique),regular=await out.embedFont(StandardFonts.Helvetica);
+  const fonts=await loadContractFonts(out),italic=fonts.italic,regular=fonts.regular;
+  const bgBytes=findBackgroundJpeg(src,src.getPage(12));const bg=bgBytes?await out.embedJpg(bgBytes):null;
   const d=p.dati,date=S.dateIt(d.dataEvento),today=S.dateIt(S.today()),d8=S.dateIt(S.minusDays(d.dataEvento,8)),d7=S.dateIt(S.minusDays(d.dataEvento,7));
   const bride=d.nomeSposa||'________________',groom=d.nomeSposo||'________________',cer=d.cerimonia||'________________',rec=d.ricevimento||'________________',resp=d.responsabile||'________________',tel=d.telefono||'________________';
   const totalNum=S.moneyNum(t.total),depNum=S.moneyNum(t.deposit),balNum=S.moneyNum(t.balance),totalWords=S.moneyWords(t.total),depWords=S.moneyWords(t.deposit),balWords=S.moneyWords(t.balance);
   const P13=copied[0],P15=copied[2],P16=copied[3],P17=copied[4],P21=copied[8];
-  patchColors.set(P13,rgb(251/255,249/255,247/255));patchColors.set(P15,rgb(254/255,253/255,252/255));patchColors.set(P16,rgb(252/255,250/255,248/255));patchColors.set(P17,rgb(253/255,252/255,250/255));patchColors.set(P21,rgb(254/255,253/255,252/255));
 
-  replaceLine(P13,[126,324,500,345],`${bride} e ${groom} qui d’innanzi`,italic,9.6);
-  replaceBox(P13,[126,615,503,667],[`fissate per il giorno ${date} presso ${cer} e il ricevimento`,`${rec}.`],italic,9.4,14.8);
+  replaceLine(P13,[127,326.3,505,343.1,339.24],`${bride} e ${groom} qui d’innanzi`,italic,12,8.8,bg);
+  replaceLines(P13,[127,617.8,505,665.2],[631.04,661.05],[`fissate per il giorno ${date} presso ${cer} e il ricevimento`,`${rec}.`],italic,12,8.1,bg);
 
-  replaceLine(P15,[91,304,500,325],`2.2 L’Evento è pianificato in data ${date} presso:`,italic,9.6);
-  replaceLine(P15,[145,333,500,354],`cerimonia presso ${cer}`,regular,9.6);
-  replaceLine(P15,[145,362,500,383],`ricevimento presso ${rec}`,regular,9.6);
-  replaceLine(P15,[91,397,500,418],`Il Responsabile in loco è identificato nella persona di ${resp}, reperibile`,italic,9.4);
-  replaceLine(P15,[91,424,500,445],`telefonicamente al seguente numero ${tel} a partire`,italic,9.4);
+  replaceLine(P15,[92,306.6,500,323.4,319.58],`2.2 L’Evento è pianificato in data ${date} presso:`,italic,12,9,bg);
+  replaceLine(P15,[145,335.7,500,352.5,348.63],`cerimonia presso ${cer}`,regular,12,8.7,bg);
+  replaceLine(P15,[145,364.2,500,381.0,377.14],`ricevimento presso ${rec}`,regular,12,8.7,bg);
+  replaceLine(P15,[92,399.6,505,416.5,412.59],`Il Responsabile in loco è identificato nella persona di ${resp}, reperibile`,italic,12,8.4,bg);
+  replaceLine(P15,[92,426.6,505,443.5,439.60],`telefonicamente al seguente numero ${tel} a partire`,italic,12,8.7,bg);
 
-  replaceLine(P16,[91,370,505,391],`${totalNum} (${totalWords}) alle seguenti coordinate bancarie:`,italic,9.3,7.0);
-  replaceWrapped(P16,[111,589,505,638],`ammontare pari ad Euro ${depNum} (${depWords}) entro e non oltre 7 giorni di calendario dalla firma del presente`,italic,9.3,2,13.8,6.8);
+  replaceLine(P16,[92,372.0,505,389.0,385.05],`${totalNum} (${totalWords}) alle seguenti coordinate bancarie:`,italic,12,8.3,bg);
+  replaceLines(P16,[112,591.4,505,636.2],[604.41,632.17],wrapTwo(italic,`ammontare pari ad Euro ${depNum} (${depWords}) entro e non oltre 7 giorni di calendario dalla firma del presente`,385,12,8.1),italic,12,8.1,bg);
 
-  replaceLine(P17,[130,98,505,119],`Euro ${balNum} (${balWords})`,italic,9.3,6.8);
-  replaceLine(P17,[127,484,515,506],`(compreso) – che nel caso di specie è individuato nel giorno ${d8};`,italic,9.3,7.1);
-  replaceLine(P17,[127,595,505,617],`(compreso) – che nel caso di specie coincide col giorno ${d7}.`,italic,9.3,7.1);
+  replaceLine(P17,[131,99.9,505,116.9,112.96],`Euro ${balNum} (${balWords})`,italic,12,8.4,bg);
+  replaceLine(P17,[128,486.6,515,503.6,499.66],`(compreso) – che nel caso di specie è individuato nel giorno ${d8};`,italic,12,8.5,bg);
+  replaceLine(P17,[128,597.7,505,614.7,610.70],`(compreso) – che nel caso di specie coincide col giorno ${d7}.`,italic,12,8.5,bg);
 
-  replaceLine(P21,[91,92,330,114],`Grandate, ${today}`,italic,9.6,8.0);
+  replaceLine(P21,[92,94.8,235,111.5,107.74],`Grandate, ${today}`,italic,12,9,bg);
+}
+async function loadContractFonts(out){
+  try{
+    if(!window.fontkit)throw new Error('fontkit non disponibile');out.registerFontkit(window.fontkit);
+    const [ia,ra]=await Promise.all([fetch(FONT_ITALIC).then(checkFont),fetch(FONT_REGULAR).then(checkFont)]);
+    return{italic:await out.embedFont(new Uint8Array(ia),{subset:true}),regular:await out.embedFont(new Uint8Array(ra),{subset:true})};
+  }catch(e){console.warn('Font IBM Plex non caricato, uso fallback',e);return{italic:await out.embedFont(StandardFonts.HelveticaOblique),regular:await out.embedFont(StandardFonts.Helvetica)}}
+}
+function checkFont(r){if(!r.ok)throw new Error('font HTTP '+r.status);return r.arrayBuffer()}
+function findBackgroundJpeg(doc,page){
+  try{return walkResources(page.node.Resources(),new Set())}catch(e){console.warn('Sfondo contratto non estratto',e);return null}
+  function walkResources(resources,seen){
+    if(!resources)return null;let xdict;try{xdict=resources.lookup(PDFName.of('XObject'),PDFDict)}catch{return null}
+    for(const[,raw]of xdict.entries()){
+      const obj=doc.context.lookup(raw);if(!obj||seen.has(obj))continue;seen.add(obj);
+      if(!(obj instanceof PDFRawStream))continue;const subtype=String(obj.dict.get(PDFName.of('Subtype'))||'');
+      if(subtype==='/Image'){
+        const w=Number(String(obj.dict.get(PDFName.of('Width'))||0)),h=Number(String(obj.dict.get(PDFName.of('Height'))||0)),filter=String(obj.dict.get(PDFName.of('Filter'))||'');
+        if(w===565&&h===800&&filter.includes('DCTDecode'))return obj.contents;
+      }
+      if(subtype==='/Form'){
+        let nested=null;try{nested=obj.dict.lookup(PDFName.of('Resources'),PDFDict)}catch{}const found=walkResources(nested,seen);if(found)return found;
+      }
+    }
+    return null;
+  }
 }
 function scale(page){const{width,height}=page.getSize();return{sx:width/REF_W,sy:height/REF_H,width,height}}
-function cover(page,box){const{x0,y0,x1,y1}=boxObj(box),s=scale(page),pad=1.7;page.drawRectangle({x:(x0-pad)*s.sx,y:s.height-(y1+pad)*s.sy,width:(x1-x0+2*pad)*s.sx,height:(y1-y0+2*pad)*s.sy,color:patchColors.get(page)||white})}
-function boxObj(b){return{x0:b[0],y0:b[1],x1:b[2],y1:b[3]}}
-function lineY(page,y0,y1,size){const s=scale(page),baseline=y1-3.2;return s.height-baseline*s.sy}
-function fitSize(font,txt,maxW,start,min){let z=start;while(z>min&&font.widthOfTextAtSize(txt,z)>maxW)z-=.15;return z}
-function replaceLine(page,box,txt,font,start=9.5,min=7.2){cover(page,box);const b=boxObj(box),s=scale(page),x=(b.x0+2)*s.sx,maxW=(b.x1-b.x0-4)*s.sx,size=fitSize(font,txt,maxW,start,min);page.drawText(String(txt),{x,y:lineY(page,b.y0,b.y1,size),size,font,color:rgb(.08,.08,.08)})}
-function replaceBox(page,box,lines,font,start=9.5,lineHeight=14.5){cover(page,box);const b=boxObj(box),s=scale(page),x=(b.x0+2)*s.sx,maxW=(b.x1-b.x0-4)*s.sx;let size=start;for(const ln of lines)size=Math.min(size,fitSize(font,ln,maxW,start,6.8));let top=b.y0+16;for(const ln of lines){page.drawText(ln,{x,y:s.height-top*s.sy,size,font,color:rgb(.08,.08,.08)});top+=lineHeight}}
+function boxObj(b){return{x0:b[0],y0:b[1],x1:b[2],y1:b[3],base:b[4]}}
+function cover(page,box,bg){
+  const b=boxObj(box),s=scale(page),pad=.45,x=(b.x0-pad)*s.sx,y=s.height-(b.y1+pad)*s.sy,w=(b.x1-b.x0+2*pad)*s.sx,h=(b.y1-b.y0+2*pad)*s.sy;
+  if(bg&&pushGraphicsState){page.pushOperators(pushGraphicsState(),moveTo(x,y),lineTo(x,y+h),lineTo(x+w,y+h),lineTo(x+w,y),closePath(),clip(),endPath());page.drawImage(bg,{x:0,y:0,width:s.width,height:s.height});page.pushOperators(popGraphicsState());}
+  else page.drawRectangle({x,y,width:w,height:h,color:white});
+}
+function fitSize(font,txt,maxW,start,min){let z=start;while(z>min&&font.widthOfTextAtSize(String(txt),z)>maxW)z-=.1;return z}
+function replaceLine(page,box,txt,font,start=12,min=8,bg=null){cover(page,box,bg);const b=boxObj(box),s=scale(page),x=b.x0*s.sx,maxW=(b.x1-b.x0)*s.sx,size=fitSize(font,txt,maxW,start,min),baseline=(b.base??(b.y0+12.3))*s.sy;page.drawText(String(txt),{x,y:s.height-baseline,size,font,color:rgb(0,0,0)})}
+function replaceLines(page,box,baselines,lines,font,start=12,min=8,bg=null){cover(page,box,bg);const b=boxObj(box),s=scale(page),x=b.x0*s.sx,maxW=(b.x1-b.x0)*s.sx;let size=start;for(const ln of lines)size=Math.min(size,fitSize(font,ln,maxW,start,min));for(let i=0;i<lines.length;i++)page.drawText(String(lines[i]),{x,y:s.height-baselines[i]*s.sy,size,font,color:rgb(0,0,0)})}
+function wrapTwo(font,txt,maxW,start,min){let size=start,lines=wrap(font,txt,size,maxW);while(lines.length>2&&size>min){size-=.1;lines=wrap(font,txt,size,maxW)}if(lines.length>2)lines=[lines[0],lines.slice(1).join(' ')];return lines.slice(0,2)}
 function wrap(font,txt,size,maxW){const words=String(txt).split(/\s+/),lines=[];let cur='';for(const w of words){const n=cur?`${cur} ${w}`:w;if(cur&&font.widthOfTextAtSize(n,size)>maxW){lines.push(cur);cur=w}else cur=n}if(cur)lines.push(cur);return lines}
-function replaceWrapped(page,box,txt,font,start,maxLines,lineHeight,min){cover(page,box);const b=boxObj(box),s=scale(page),x=(b.x0+2)*s.sx,maxW=(b.x1-b.x0-4)*s.sx;let size=start,lines=wrap(font,txt,size,maxW);while(lines.length>maxLines&&size>min){size-=.15;lines=wrap(font,txt,size,maxW)}if(lines.length>maxLines){lines=lines.slice(0,maxLines-1).concat(lines.slice(maxLines-1).join(' '));size=fitSize(font,lines[maxLines-1],maxW,size,min)}let top=b.y0+16;for(const ln of lines){page.drawText(ln,{x,y:s.height-top*s.sy,size,font,color:rgb(.08,.08,.08)});top+=lineHeight}}
 function dataBytes(url){const b64=String(url).split(',')[1]||'',bin=atob(b64),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u}
 S.sharePdf=async(bytes,name)=>{const blob=new Blob([bytes],{type:'application/pdf'}),file=new File([blob],name,{type:'application/pdf'});if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]})))return navigator.share({title:name,files:[file]});const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)};
 })();
