@@ -6,6 +6,8 @@ const PAGE=[595.28,841.89],sage=rgb(.49,.57,.41),dark=rgb(.20,.24,.18),paper=rgb
 const REF_W=595.5,REF_H=842.25;
 const FONT_ITALIC='https://cdn.jsdelivr.net/fontsource/fonts/ibm-plex-sans-condensed@5.3.0/latin-400-italic.woff';
 const FONT_REGULAR='https://cdn.jsdelivr.net/fontsource/fonts/ibm-plex-sans-condensed@5.3.0/latin-400-normal.woff';
+const BG_STANDARD=[-0.12604749,0.00042725,596.18072510,843.08062744];
+const BG_PAGE16=[-0.12604749,-29.88275146,596.18072510,813.19744873];
 
 S.generatePdf=async p=>{
   if(!window.PDFLib)throw new Error('Motore PDF non disponibile. Ricarica la pagina con connessione attiva.');
@@ -31,29 +33,35 @@ async function pricing(out,p,t,font,bold){const pg=basePage(out);center(pg,'PREV
 async function appendOriginalContract(out,src,p,t){
   const copied=await out.copyPages(src,[12,13,14,15,16,17,18,19,20]);for(const pg of copied)out.addPage(pg);
   const fonts=await loadContractFonts(out),italic=fonts.italic,regular=fonts.regular;
-  const bgBytes=findBackgroundJpeg(src,src.getPage(12));const bg=bgBytes?await out.embedJpg(bgBytes):null;
+  const backgrounds={
+    13:await makeBackground(out,src,12,BG_STANDARD),
+    15:await makeBackground(out,src,14,BG_STANDARD),
+    16:await makeBackground(out,src,15,BG_PAGE16),
+    17:await makeBackground(out,src,16,BG_STANDARD),
+    21:await makeBackground(out,src,20,BG_STANDARD)
+  };
   const d=p.dati,date=S.dateIt(d.dataEvento),today=S.dateIt(S.today()),d8=S.dateIt(S.minusDays(d.dataEvento,8)),d7=S.dateIt(S.minusDays(d.dataEvento,7));
   const bride=d.nomeSposa||'________________',groom=d.nomeSposo||'________________',cer=d.cerimonia||'________________',rec=d.ricevimento||'________________',resp=d.responsabile||'________________',tel=d.telefono||'________________';
   const totalNum=S.moneyNum(t.total),depNum=S.moneyNum(t.deposit),balNum=S.moneyNum(t.balance),totalWords=S.moneyWords(t.total),depWords=S.moneyWords(t.deposit),balWords=S.moneyWords(t.balance);
   const P13=copied[0],P15=copied[2],P16=copied[3],P17=copied[4],P21=copied[8];
 
-  replaceLine(P13,[127,326.3,505,343.1,339.24],`${bride} e ${groom} qui d’innanzi`,italic,12,8.8,bg);
-  replaceLines(P13,[127,617.8,505,665.2],[631.04,661.05],[`fissate per il giorno ${date} presso ${cer} e il ricevimento`,`${rec}.`],italic,12,8.1,bg);
+  replaceLine(P13,[127,324.8,505,344.5,339.24],`${bride} e ${groom} qui d’innanzi`,italic,12,9.2,backgrounds[13]);
+  replaceWrapped(P13,[127,617.0,505,666.0],[631.04,661.05],`fissate per il giorno ${date} presso ${cer} e il ricevimento ${rec}.`,italic,12,9.7,2,backgrounds[13]);
 
-  replaceLine(P15,[92,306.6,500,323.4,319.58],`2.2 L’Evento è pianificato in data ${date} presso:`,italic,12,9,bg);
-  replaceLine(P15,[145,335.7,500,352.5,348.63],`cerimonia presso ${cer}`,regular,12,8.7,bg);
-  replaceLine(P15,[145,364.2,500,381.0,377.14],`ricevimento presso ${rec}`,regular,12,8.7,bg);
-  replaceLine(P15,[92,399.6,505,416.5,412.59],`Il Responsabile in loco è identificato nella persona di ${resp}, reperibile`,italic,12,8.4,bg);
-  replaceLine(P15,[92,426.6,505,443.5,439.60],`telefonicamente al seguente numero ${tel} a partire`,italic,12,8.7,bg);
+  replaceLine(P15,[92,305.5,500,324.8,319.58],`2.2 L’Evento è pianificato in data ${date} presso:`,italic,12,9.4,backgrounds[15]);
+  replaceLine(P15,[145,334.6,500,353.6,348.63],`cerimonia presso ${cer}`,regular,12,9.2,backgrounds[15]);
+  replaceLine(P15,[145,363.1,500,382.1,377.14],`ricevimento presso ${rec}`,regular,12,9.2,backgrounds[15]);
+  replaceLine(P15,[92,398.8,505,417.2,412.59],`Il Responsabile in loco è identificato nella persona di ${resp}, reperibile`,italic,12,9.1,backgrounds[15]);
+  replaceLine(P15,[92,425.8,505,444.3,439.60],`telefonicamente al seguente numero ${tel} a partire`,italic,12,9.2,backgrounds[15]);
 
-  replaceLine(P16,[92,372.0,505,389.0,385.05],`${totalNum} (${totalWords}) alle seguenti coordinate bancarie:`,italic,12,8.3,bg);
-  replaceLines(P16,[112,591.4,505,636.2],[604.41,632.17],wrapTwo(italic,`ammontare pari ad Euro ${depNum} (${depWords}) entro e non oltre 7 giorni di calendario dalla firma del presente`,385,12,8.1),italic,12,8.1,bg);
+  replaceWrapped(P16,[92,371.4,505,414.8],[385.05,407.3],`${totalNum} (${totalWords}) alle seguenti coordinate bancarie:`,italic,12,10.4,2,backgrounds[16]);
+  replaceWrapped(P16,[112,590.7,505,637.0],[604.41,632.17],`ammontare pari ad Euro ${depNum} (${depWords}) entro e non oltre 7 giorni di calendario dalla firma del presente`,italic,12,10.2,2,backgrounds[16]);
 
-  replaceLine(P17,[131,99.9,505,116.9,112.96],`Euro ${balNum} (${balWords})`,italic,12,8.4,bg);
-  replaceLine(P17,[128,486.6,515,503.6,499.66],`(compreso) – che nel caso di specie è individuato nel giorno ${d8};`,italic,12,8.5,bg);
-  replaceLine(P17,[128,597.7,505,614.7,610.70],`(compreso) – che nel caso di specie coincide col giorno ${d7}.`,italic,12,8.5,bg);
+  replaceLine(P17,[131,99.0,505,118.0,112.96],`Euro ${balNum} (${balWords})`,italic,12,9.3,backgrounds[17]);
+  replaceLine(P17,[128,486.0,515,504.7,499.66],`(compreso) – che nel caso di specie è individuato nel giorno ${d8};`,italic,12,9.3,backgrounds[17]);
+  replaceLine(P17,[128,597.1,505,615.8,610.70],`(compreso) – che nel caso di specie coincide col giorno ${d7}.`,italic,12,9.3,backgrounds[17]);
 
-  replaceLine(P21,[92,94.8,235,111.5,107.74],`Grandate, ${today}`,italic,12,9,bg);
+  replaceLine(P21,[92,94.0,240,112.5,107.74],`Grandate, ${today}`,italic,12,9.5,backgrounds[21]);
 }
 async function loadContractFonts(out){
   try{
@@ -63,6 +71,7 @@ async function loadContractFonts(out){
   }catch(e){console.warn('Font IBM Plex non caricato, uso fallback',e);return{italic:await out.embedFont(StandardFonts.HelveticaOblique),regular:await out.embedFont(StandardFonts.Helvetica)}}
 }
 function checkFont(r){if(!r.ok)throw new Error('font HTTP '+r.status);return r.arrayBuffer()}
+async function makeBackground(out,src,pageIndex,rect){const bytes=findBackgroundJpeg(src,src.getPage(pageIndex));return bytes?{image:await out.embedJpg(bytes),rect}:null}
 function findBackgroundJpeg(doc,page){
   try{return walkResources(page.node.Resources(),new Set())}catch(e){console.warn('Sfondo contratto non estratto',e);return null}
   function walkResources(resources,seen){
@@ -81,17 +90,20 @@ function findBackgroundJpeg(doc,page){
     return null;
   }
 }
-function scale(page){const{width,height}=page.getSize();return{sx:width/REF_W,sy:height/REF_H,width,height}}
+function geom(page){const m=page.getMediaBox(),sx=m.width/REF_W,sy=m.height/REF_H;return{x0:m.x,y0:m.y,width:m.width,height:m.height,sx,sy}}
 function boxObj(b){return{x0:b[0],y0:b[1],x1:b[2],y1:b[3],base:b[4]}}
 function cover(page,box,bg){
-  const b=boxObj(box),s=scale(page),pad=.45,x=(b.x0-pad)*s.sx,y=s.height-(b.y1+pad)*s.sy,w=(b.x1-b.x0+2*pad)*s.sx,h=(b.y1-b.y0+2*pad)*s.sy;
-  if(bg&&pushGraphicsState){page.pushOperators(pushGraphicsState(),moveTo(x,y),lineTo(x,y+h),lineTo(x+w,y+h),lineTo(x+w,y),closePath(),clip(),endPath());page.drawImage(bg,{x:0,y:0,width:s.width,height:s.height});page.pushOperators(popGraphicsState());}
-  else page.drawRectangle({x,y,width:w,height:h,color:white});
+  const b=boxObj(box),g=geom(page),pad=1.35,x=g.x0+(b.x0-pad)*g.sx,y=g.y0+g.height-(b.y1+pad)*g.sy,w=(b.x1-b.x0+2*pad)*g.sx,h=(b.y1-b.y0+2*pad)*g.sy;
+  if(bg?.image&&pushGraphicsState){
+    const r=bg.rect,bx=g.x0+r[0]*g.sx,by=g.y0+g.height-r[3]*g.sy,bw=(r[2]-r[0])*g.sx,bh=(r[3]-r[1])*g.sy;
+    page.pushOperators(pushGraphicsState(),moveTo(x,y),lineTo(x,y+h),lineTo(x+w,y+h),lineTo(x+w,y),closePath(),clip(),endPath());
+    page.drawImage(bg.image,{x:bx,y:by,width:bw,height:bh});
+    page.pushOperators(popGraphicsState());
+  }else page.drawRectangle({x,y,width:w,height:h,color:white});
 }
-function fitSize(font,txt,maxW,start,min){let z=start;while(z>min&&font.widthOfTextAtSize(String(txt),z)>maxW)z-=.1;return z}
-function replaceLine(page,box,txt,font,start=12,min=8,bg=null){cover(page,box,bg);const b=boxObj(box),s=scale(page),x=b.x0*s.sx,maxW=(b.x1-b.x0)*s.sx,size=fitSize(font,txt,maxW,start,min),baseline=(b.base??(b.y0+12.3))*s.sy;page.drawText(String(txt),{x,y:s.height-baseline,size,font,color:rgb(0,0,0)})}
-function replaceLines(page,box,baselines,lines,font,start=12,min=8,bg=null){cover(page,box,bg);const b=boxObj(box),s=scale(page),x=b.x0*s.sx,maxW=(b.x1-b.x0)*s.sx;let size=start;for(const ln of lines)size=Math.min(size,fitSize(font,ln,maxW,start,min));for(let i=0;i<lines.length;i++)page.drawText(String(lines[i]),{x,y:s.height-baselines[i]*s.sy,size,font,color:rgb(0,0,0)})}
-function wrapTwo(font,txt,maxW,start,min){let size=start,lines=wrap(font,txt,size,maxW);while(lines.length>2&&size>min){size-=.1;lines=wrap(font,txt,size,maxW)}if(lines.length>2)lines=[lines[0],lines.slice(1).join(' ')];return lines.slice(0,2)}
+function fitSize(font,txt,maxW,start,min){let z=start;while(z>min&&font.widthOfTextAtSize(String(txt),z)>maxW)z-=.1;return Math.max(z,min)}
+function replaceLine(page,box,txt,font,start=12,min=9,bg=null){cover(page,box,bg);const b=boxObj(box),g=geom(page),x=g.x0+b.x0*g.sx,maxW=(b.x1-b.x0)*g.sx,size=fitSize(font,txt,maxW,start,min),baseline=b.base??(b.y0+12.3);page.drawText(String(txt),{x,y:g.y0+g.height-baseline*g.sy,size,font,color:rgb(0,0,0)})}
+function replaceWrapped(page,box,baselines,txt,font,start,min,maxLines,bg=null){cover(page,box,bg);const b=boxObj(box),g=geom(page),x=g.x0+b.x0*g.sx,maxW=(b.x1-b.x0)*g.sx;let size=start,lines=wrap(font,txt,size,maxW);while(lines.length>maxLines&&size>min){size-=.1;lines=wrap(font,txt,size,maxW)}if(lines.length>maxLines){lines=lines.slice(0,maxLines-1).concat(lines.slice(maxLines-1).join(' '));size=fitSize(font,lines[maxLines-1],maxW,size,min)}for(let i=0;i<Math.min(lines.length,maxLines);i++)page.drawText(String(lines[i]),{x,y:g.y0+g.height-baselines[i]*g.sy,size,font,color:rgb(0,0,0)})}
 function wrap(font,txt,size,maxW){const words=String(txt).split(/\s+/),lines=[];let cur='';for(const w of words){const n=cur?`${cur} ${w}`:w;if(cur&&font.widthOfTextAtSize(n,size)>maxW){lines.push(cur);cur=w}else cur=n}if(cur)lines.push(cur);return lines}
 function dataBytes(url){const b64=String(url).split(',')[1]||'',bin=atob(b64),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u}
 S.sharePdf=async(bytes,name)=>{const blob=new Blob([bytes],{type:'application/pdf'}),file=new File([blob],name,{type:'application/pdf'});if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]})))return navigator.share({title:name,files:[file]});const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)};
