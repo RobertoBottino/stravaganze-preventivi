@@ -2,7 +2,7 @@ window.SF=window.SF||{};
 (()=>{'use strict';
 const S=window.SF;const {PDFDocument,StandardFonts,rgb}=window.PDFLib||{};
 const PAGE=[595.28,841.89],sage=rgb(.49,.57,.41),dark=rgb(.20,.24,.18),paper=rgb(.995,.989,.97),white=rgb(1,1,1);
-const REF_W=595.5,REF_H=842.25;
+const REF_W=595.5,REF_H=842.25,patchColors=new WeakMap();
 S.generatePdf=async p=>{
   if(!window.PDFLib)throw new Error('Motore PDF non disponibile. Ricarica la pagina con connessione attiva.');
   p=S.migrateProject(p);const t=S.calc(p),out=await PDFDocument.create(),font=await out.embedFont(StandardFonts.TimesRoman),bold=await out.embedFont(StandardFonts.TimesRomanBold);
@@ -31,6 +31,7 @@ async function appendOriginalContract(out,src,p,t){
   const bride=d.nomeSposa||'________________',groom=d.nomeSposo||'________________',cer=d.cerimonia||'________________',rec=d.ricevimento||'________________',resp=d.responsabile||'________________',tel=d.telefono||'________________';
   const totalNum=S.moneyNum(t.total),depNum=S.moneyNum(t.deposit),balNum=S.moneyNum(t.balance),totalWords=S.moneyWords(t.total),depWords=S.moneyWords(t.deposit),balWords=S.moneyWords(t.balance);
   const P13=copied[0],P15=copied[2],P16=copied[3],P17=copied[4],P21=copied[8];
+  patchColors.set(P13,rgb(251/255,249/255,247/255));patchColors.set(P15,rgb(254/255,253/255,252/255));patchColors.set(P16,rgb(252/255,250/255,248/255));patchColors.set(P17,rgb(253/255,252/255,250/255));patchColors.set(P21,rgb(254/255,253/255,252/255));
 
   replaceLine(P13,[126,324,500,345],`${bride} e ${groom} qui d’innanzi`,italic,9.6);
   replaceBox(P13,[126,615,503,667],[`fissate per il giorno ${date} presso ${cer} e il ricevimento`,`${rec}.`],italic,9.4,14.8);
@@ -51,7 +52,7 @@ async function appendOriginalContract(out,src,p,t){
   replaceLine(P21,[91,92,330,114],`Grandate, ${today}`,italic,9.6,8.0);
 }
 function scale(page){const{width,height}=page.getSize();return{sx:width/REF_W,sy:height/REF_H,width,height}}
-function cover(page,box){const{x0,y0,x1,y1}=boxObj(box),s=scale(page),pad=1.7;page.drawRectangle({x:(x0-pad)*s.sx,y:s.height-(y1+pad)*s.sy,width:(x1-x0+2*pad)*s.sx,height:(y1-y0+2*pad)*s.sy,color:white})}
+function cover(page,box){const{x0,y0,x1,y1}=boxObj(box),s=scale(page),pad=1.7;page.drawRectangle({x:(x0-pad)*s.sx,y:s.height-(y1+pad)*s.sy,width:(x1-x0+2*pad)*s.sx,height:(y1-y0+2*pad)*s.sy,color:patchColors.get(page)||white})}
 function boxObj(b){return{x0:b[0],y0:b[1],x1:b[2],y1:b[3]}}
 function lineY(page,y0,y1,size){const s=scale(page),baseline=y1-3.2;return s.height-baseline*s.sy}
 function fitSize(font,txt,maxW,start,min){let z=start;while(z>min&&font.widthOfTextAtSize(txt,z)>maxW)z-=.15;return z}
