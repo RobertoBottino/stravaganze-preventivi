@@ -23,12 +23,13 @@ S.all=async store=>{const db=await S.openDb();return new Promise((ok,ko)=>{const
 S.calc=p=>{
   const base=S.round((p.preventivo.voci||[]).reduce((a,v)=>a+S.num(v.quantita)*S.num(v.prezzoUnitario),0));
   const lab=S.round(base*S.num(p.preventivo.manodoperaPct)/100);
-  const taxable=S.round(base+lab);
+  const planner=S.round(base*S.num(p.preventivo.weddingPlannerPct)/100);
+  const taxable=S.round(base+lab+planner);
   const vat=S.round(taxable*S.num(p.preventivo.ivaPct)/100);
   const total=S.round(taxable+vat);
   const deposit=S.round(total*.30);
   const balance=S.round(total*.70);
-  return{base,lab,taxable,vat,total,deposit,balance};
+  return{base,lab,planner,taxable,vat,total,deposit,balance};
 };
 
 function under100(n){
@@ -63,7 +64,7 @@ S.moneyWords=n=>{
 S.toDataUrl=file=>new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>ko(r.error);r.readAsDataURL(file)});
 S.imageToJpeg=async(file,maxSide=1800,quality=.86)=>{const url=URL.createObjectURL(file);try{const img=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>ko(new Error('Immagine non leggibile'));i.src=url});const scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale)),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(img,0,0,w,h);return c.toDataURL('image/jpeg',quality)}finally{URL.revokeObjectURL(url)}};
 
-S.newProject=()=>({id:S.uuid(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),dati:{nomeSposa:'',nomeSposo:'',cerimonia:'',ricevimento:'',dataEvento:'',responsabile:'',telefono:''},preventivo:{voci:[],manodoperaPct:20,ivaPct:22,caparraPct:30,bonusDesc:'',bonusValue:0},pagine:[]});
-S.migrateProject=p=>{p=p||S.newProject();p.dati=p.dati||{};if(!p.dati.cerimonia)p.dati.cerimonia=[p.dati.cerimoniaNome,p.dati.cerimoniaIndirizzo].filter(Boolean).join(', ');if(!p.dati.ricevimento)p.dati.ricevimento=[p.dati.ricevimentoNome,p.dati.ricevimentoIndirizzo].filter(Boolean).join(', ');p.preventivo=p.preventivo||{};p.preventivo.voci=p.preventivo.voci||[];p.preventivo.caparraPct=30;p.pagine=p.pagine||[];return p};
+S.newProject=()=>({id:S.uuid(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),dati:{nomeSposa:'',nomeSposo:'',cerimonia:'',ricevimento:'',dataEvento:'',responsabile:'',telefono:''},preventivo:{voci:[],manodoperaPct:20,weddingPlannerPct:0,ivaPct:22,caparraPct:30,bonusDesc:'',bonusValue:0},pagine:[]});
+S.migrateProject=p=>{p=p||S.newProject();p.dati=p.dati||{};if(!p.dati.cerimonia)p.dati.cerimonia=[p.dati.cerimoniaNome,p.dati.cerimoniaIndirizzo].filter(Boolean).join(', ');if(!p.dati.ricevimento)p.dati.ricevimento=[p.dati.ricevimentoNome,p.dati.ricevimentoIndirizzo].filter(Boolean).join(', ');p.preventivo=p.preventivo||{};p.preventivo.voci=p.preventivo.voci||[];p.preventivo.caparraPct=30;if(p.preventivo.weddingPlannerPct==null)p.preventivo.weddingPlannerPct=0;p.pagine=p.pagine||[];return p};
 S.defaultBusiness=()=>({id:'business'});
 })();
