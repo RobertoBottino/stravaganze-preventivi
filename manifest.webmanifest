@@ -1,0 +1,11 @@
+{
+  "name":"Stravaganze Floreali - Preventivi",
+  "short_name":"SF Preventivi",
+  "description":"Preventivi e contratti matrimonio di Stravaganze Floreali",
+  "start_url":"./",
+  "scope":"./",
+  "display":"standalone",
+  "background_color":"#f6f3ec",
+  "theme_color":"#7d9268",
+  "icons":[{"src":"./icons/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
