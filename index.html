@@ -1,92 +1,33 @@
 <!doctype html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#7d9268" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="SF Preventivi" />
-  <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="./styles.css" />
-  <title>Stravaganze Floreali - Preventivi</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#7d9268" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="SF Preventivi" />
+<link rel="manifest" href="./manifest.webmanifest?v=7" />
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="./styles.css?v=7" />
+<title>Stravaganze Floreali - Preventivi</title>
 </head>
 <body>
 <div class="app-shell">
-  <header class="topbar">
-    <div class="brand"><div class="brand-mark">SF</div><div><strong>Stravaganze Floreali</strong><span>Preventivi</span></div></div>
-    <div class="top-actions"><span id="saveState" class="save-state">Salvato</span><button class="btn ghost" id="installBtn">Installa app</button><button class="btn ghost" id="archiveBtn">Archivio</button></div>
-  </header>
-
-  <div class="project-head">
-    <div><span class="eyebrow">MATRIMONIO</span><h1 id="projectTitle">Nuovo matrimonio</h1><p id="projectSub">Data evento da inserire · € 0,00</p></div>
-    <div class="project-actions"><button class="btn secondary" id="newBtn">+ Nuovo</button><button class="btn secondary" id="backupBtn">Backup</button><button class="btn secondary" id="importBtn">Importa</button><input id="importFile" hidden type="file" accept="application/json,.json" /></div>
-  </div>
-
-  <main class="content">
-    <section class="card">
-      <div class="section-title"><div><span class="step">1</span><h2>Dati matrimonio e contratto</h2></div><p>Questi campi alimentano automaticamente il contratto finale.</p></div>
-      <div class="form-grid two" id="contractFields"></div>
-    </section>
-
-    <section class="card">
-      <div class="section-title section-title-row"><div><div><span class="step">2</span><h2>Pagine della proposta</h2></div><p>Ogni pagina può contenere fino a 3 immagini, testo e prezzo.</p></div><button class="btn secondary" id="addProposalBtn">+ Aggiungi pagina</button></div>
-      <div id="proposalList" class="proposal-list"></div>
-    </section>
-
-    <section class="card">
-      <div class="section-title section-title-row"><div><div><span class="step">3</span><h2>Preventivo</h2></div><p>Inserisci descrizione, quantità e prezzo unitario.</p></div><button class="btn secondary" id="addRowBtn">+ Voce</button></div>
-      <div class="pricing-wrap">
-        <table class="pricing-table">
-          <thead><tr><th>Descrizione</th><th>Q.tà</th><th>Prezzo</th><th>Totale</th><th></th></tr></thead>
-          <tbody id="pricingRows"></tbody>
-        </table>
-      </div>
-      <div class="calc-grid">
-        <label class="field"><span>Manodopera (%)</span><input id="laborPct" type="number" min="0" step="0.1" /></label>
-        <label class="field"><span>IVA (%)</span><input id="vatPct" type="number" min="0" step="0.1" /></label>
-        <label class="field"><span>Caparra (%)</span><input id="depositPct" type="number" min="0" step="0.1" /></label>
-      </div>
-      <div class="totals-card" id="totals"></div>
-      <div class="bonus-box"><h3>Bonus / omaggi</h3><div class="form-grid two"><label class="field"><span>Descrizione</span><input id="bonusDesc" placeholder="es. Flower bar in omaggio" /></label><label class="field"><span>Valore indicativo €</span><input id="bonusValue" type="number" min="0" step="0.01" /></label></div></div>
-    </section>
-
-    <section class="card">
-      <div class="section-title"><div><span class="step">4</span><h2>Template statico PDF</h2></div><p>Carica una sola volta il PDF completo di riferimento. Resta salvato sul dispositivo.</p></div>
-      <div class="form-grid two">
-        <label class="field"><span>PDF completo di riferimento</span><input id="templateInput" type="file" accept="application/pdf,.pdf" /></label>
-        <div class="field"><span>Stato template</span><div id="templateStatus"><b>Template non caricato</b></div><small id="templateMeta"></small></div>
-        <label class="field"><span>Pagine Storybrand</span><input id="storyRange" value="1-7" /></label>
-        <label class="field"><span>Pagine testimonianze</span><input id="testRange" value="11-12" /></label>
-      </div>
-    </section>
-
-    <section class="card">
-      <details class="advanced">
-        <summary>Dati aziendali e bancari</summary>
-        <div class="form-grid two details-body" id="businessFields"></div>
-      </details>
-    </section>
-
-    <section class="card final-card">
-      <div class="section-title"><div><span class="step">5</span><h2>Genera documento</h2></div><p>Storybrand → proposta → preventivo → testimonianze → contratto e firme.</p></div>
-      <button class="btn primary big" id="generateBtn">GENERA PDF</button>
-      <small class="privacy-note">Le bozze, le foto e il PDF di riferimento restano nel browser del dispositivo.</small>
-    </section>
-  </main>
-</div>
-
-<div class="drawer-backdrop" id="archiveDrawer" hidden>
-  <aside class="drawer"><div class="drawer-head"><h2>Archivio preventivi</h2><button id="closeArchive">×</button></div><button class="btn primary full" id="drawerNewBtn">+ Nuovo matrimonio</button><div id="archiveList" class="archive-list"></div></aside>
-</div>
-
-<div class="modal-backdrop" id="installModal" hidden><div class="modal"><button class="modal-close" id="closeInstall">×</button><h3>Installa senza App Store</h3><p><strong>iPhone / iPad:</strong> Safari → Condividi → <em>Aggiungi alla schermata Home</em>.</p><p><strong>Android:</strong> Chrome → menu → <em>Installa app</em>.</p></div></div>
-
+<header class="topbar"><div class="brand"><div class="brand-mark">SF</div><div><strong>Stravaganze Floreali</strong><span>Preventivi</span></div></div><div class="top-actions"><span id="saveState" class="save-state">Salvato</span><button class="btn ghost" id="installBtn">Installa app</button><button class="btn ghost" id="archiveBtn">Archivio</button></div></header>
+<div class="project-head"><div><span class="eyebrow">MATRIMONIO</span><h1 id="projectTitle">Nuovo matrimonio</h1><p id="projectSub">Data evento da inserire · € 0,00</p></div><div class="project-actions"><button class="btn secondary" id="newBtn">+ Nuovo</button><button class="btn secondary" id="backupBtn">Backup</button><button class="btn secondary" id="importBtn">Importa</button><input id="importFile" hidden type="file" accept="application/json,.json" /></div></div>
+<main class="content">
+<section class="card"><div class="section-title"><div><span class="step">1</span><h2>Dati matrimonio e contratto</h2></div><p>Compila solo i dati variabili. Importi, date -8/-7 giorni e data odierna vengono calcolati automaticamente.</p></div><div class="form-grid two" id="contractFields"></div></section>
+<section class="card"><div class="section-title section-title-row"><div><div><span class="step">2</span><h2>Pagine della proposta</h2></div><p>Ogni pagina può contenere fino a 3 immagini, testo e prezzo.</p></div><button class="btn secondary" id="addProposalBtn">+ Aggiungi pagina</button></div><div id="proposalList" class="proposal-list"></div></section>
+<section class="card"><div class="section-title section-title-row"><div><div><span class="step">3</span><h2>Preventivo</h2></div><p>Il contratto usa automaticamente totale, caparra 30% e saldo 70%, anche in lettere.</p></div><button class="btn secondary" id="addRowBtn">+ Voce</button></div><div class="pricing-wrap"><table class="pricing-table"><thead><tr><th>Descrizione</th><th>Q.tà</th><th>Prezzo</th><th>Totale</th><th></th></tr></thead><tbody id="pricingRows"></tbody></table></div><div class="calc-grid"><label class="field"><span>Manodopera (%)</span><input id="laborPct" type="number" min="0" step="0.1" /></label><label class="field"><span>IVA (%)</span><input id="vatPct" type="number" min="0" step="0.1" /></label></div><div class="totals-card" id="totals"></div><div class="bonus-box"><h3>Bonus / omaggi</h3><div class="form-grid two"><label class="field"><span>Descrizione</span><input id="bonusDesc" placeholder="es. Flower bar in omaggio" /></label><label class="field"><span>Valore indicativo €</span><input id="bonusValue" type="number" min="0" step="0.01" /></label></div></div></section>
+<section class="card"><div class="section-title"><div><span class="step">4</span><h2>Template completo PDF</h2></div><p>Carica il PDF completo con i PLACEHOLDER: le pagine 13-21 del contratto restano originali e vengono sostituiti solo i campi variabili.</p></div><div class="form-grid two"><label class="field"><span>PDF completo con PLACEHOLDER</span><input id="templateInput" type="file" accept="application/pdf,.pdf" /></label><div class="field"><span>Stato template</span><div id="templateStatus"><b>Template non caricato</b></div><small id="templateMeta"></small></div><label class="field"><span>Pagine Storybrand</span><input id="storyRange" value="1-7" /></label><label class="field"><span>Pagine testimonianze</span><input id="testRange" value="11-12" /></label></div></section>
+<section class="card final-card"><div class="section-title"><div><span class="step">5</span><h2>Genera documento</h2></div><p>Storybrand → proposta → preventivo → testimonianze → contratto originale pagine 13-21 compilato.</p></div><button class="btn primary big" id="generateBtn">GENERA PDF</button><small class="privacy-note">Le bozze, le foto e il PDF di riferimento restano nel browser del dispositivo.</small></section>
+</main></div>
+<div class="drawer-backdrop" id="archiveDrawer" hidden><aside class="drawer"><div class="drawer-head"><h2>Archivio preventivi</h2><button id="closeArchive">×</button></div><button class="btn primary full" id="drawerNewBtn">+ Nuovo matrimonio</button><div id="archiveList" class="archive-list"></div></aside></div>
+<div class="modal-backdrop" id="installModal" hidden><div class="modal"><button class="modal-close" id="closeInstall">×</button><h3>Installa senza store</h3><p><strong>iPhone / iPad:</strong> Safari → Condividi → <em>Aggiungi alla schermata Home</em>.</p><p><strong>Android:</strong> Chrome → menu → <em>Installa app</em>.</p></div></div>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-<script src="./db.js"></script>
-<script src="./contract.js"></script>
-<script src="./pdf.js"></script>
-<script src="./app.js"></script>
+<script src="./db.js?v=7"></script>
+<script src="./pdf.js?v=7"></script>
+<script src="./app.js?v=7"></script>
 </body>
 </html>
