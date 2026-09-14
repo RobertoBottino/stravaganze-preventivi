@@ -7,16 +7,16 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="SF Preventivi" />
-<link rel="manifest" href="./manifest.webmanifest?v=14" />
+<link rel="manifest" href="./manifest.webmanifest?v=15" />
 <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-<link rel="stylesheet" href="./styles.css?v=14" />
-<link rel="stylesheet" href="./proposal-v14.css?v=14" />
+<link rel="stylesheet" href="./styles.css?v=15" />
+<link rel="stylesheet" href="./proposal-v14.css?v=15" />
 <title>Stravaganze Floreali - Preventivi</title>
 </head>
 <body>
 <div class="app-shell">
 <header class="topbar"><div class="brand"><div class="brand-mark">SF</div><div><strong>Stravaganze Floreali</strong><span>Preventivi</span></div></div><div class="top-actions"><span id="saveState" class="save-state">Salvato</span><button class="btn ghost" id="installBtn">Installa app</button><button class="btn ghost" id="archiveBtn">Archivio</button></div></header>
-<div class="project-head"><div><span class="eyebrow">MATRIMONIO</span><h1 id="projectTitle">Nuovo matrimonio</h1><p id="projectSub">Data evento da inserire · € 0,00</p></div><div class="project-actions"><button class="btn secondary" id="newBtn">+ Nuovo</button><button class="btn secondary" id="backupBtn">Backup</button><button class="btn secondary" id="importBtn">Importa</button><input id="importFile" hidden type="file" accept="application/json,.json" /></div></div>
+<div class="project-head"><div><span class="eyebrow">MATRIMONIO</span><h1 id="projectTitle">Nuovo matrimonio</h1><p id="projectSub">Data evento da inserire · € 0,00</p></div><div class="project-actions"><button class="btn secondary" id="newBtn">+ Nuovo</button><button class="btn secondary" id="backupBtn">Backup</button><button class="btn secondary" id="importBtn">Importa backup</button><button class="btn secondary" id="importPdfBtn">Importa PDF</button><input id="importFile" hidden type="file" accept="application/json,.json" /><input id="importPdfFile" hidden type="file" accept="application/pdf,.pdf" /></div></div>
 <main class="content">
 <section class="card"><div class="section-title"><div><span class="step">1</span><h2>Dati matrimonio e contratto</h2></div><p>Compila solo i dati variabili. Importi, date -8/-7 giorni e data odierna vengono calcolati automaticamente.</p></div><div class="form-grid two" id="contractFields"></div></section>
 <section class="card"><div class="section-title section-title-row"><div><div><span class="step">2</span><h2>Pagine della proposta</h2></div><p>Puoi aggiungere tutte le immagini che vuoi e scrivere una descrizione sotto ciascuna. Nel PDF vengono impaginate al massimo 2 per riga; se sono dispari, l’ultima viene centrata.</p></div><button class="btn secondary" id="addProposalBtn">+ Aggiungi pagina</button></div><div id="proposalList" class="proposal-list"></div></section>
@@ -29,10 +29,12 @@
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="./db.js?v=14"></script>
+<script src="./db.js?v=15"></script>
 <script src="./pdf.js?v=9"></script>
 <script src="./contract-v10.js?v=10"></script>
 <script src="./pdf-v10.js?v=14"></script>
+<script src="./project-embed-v15.js?v=15"></script>
 <script src="./app.js?v=14"></script>
+<script src="./pdf-import-v15.js?v=15"></script>
 </body>
 </html>
