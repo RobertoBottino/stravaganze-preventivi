@@ -2,7 +2,7 @@ window.SF=window.SF||{};
 (()=>{'use strict';
 const S=window.SF;
 const PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const W=595.28,H=841.89;
+const W=595.28;
 
 document.addEventListener('DOMContentLoaded',()=>{
   const btn=document.getElementById('importPdfBtn'),input=document.getElementById('importPdfFile');
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     }catch(err){console.error(err);alert(err.message||'Impossibile importare il PDF.');btn.disabled=false;btn.textContent=old}
   };
   const msg=sessionStorage.getItem('sf-pdf-import-result');
-  if(msg){sessionStorage.removeItem('sf-pdf-import-result');try{const r=JSON.parse(msg);setTimeout(()=>alert(r.mode==='exact'?'PDF Stravaganze riconosciuto: progetto importato integralmente.':'PDF importato in modalità compatibilità. Controlla immagini, testi e prezzi prima di rigenerarlo.'+(r.warnings?.length?'\n\n'+r.warnings.join('\n'):'')),250)}catch{}}
+  if(msg){sessionStorage.removeItem('sf-pdf-import-result');try{const r=JSON.parse(msg);setTimeout(()=>alert(r.mode==='exact'?'PDF Stravaganze riconosciuto: progetto importato integralmente.':'PDF importato in modalità compatibilità. Controlla i dati evidenziati dal documento originale prima di rigenerarlo.'+(r.warnings?.length?'\n\n'+r.warnings.join('\n'):'')),250)}catch{}}
 });
 
 async function importPdf(file){
@@ -50,11 +50,12 @@ async function fromAttachment(doc){
 }
 
 async function bestEffort(doc,fileName){
-  const warnings=['Le percentuali interne non presenti nel PDF non possono essere ricostruite: i prezzi visibili vengono importati come prezzi base.'];
+  const warnings=['PDF precedente alla modalità progetto: alcuni dati interni non visibili nel documento (per esempio manodopera e wedding planner) non possono essere ricostruiti con certezza.'];
   const p=S.newProject();p.preventivo.manodoperaPct=0;p.preventivo.weddingPlannerPct=0;
   const pageData=[];
   for(let i=1;i<=doc.numPages;i++)pageData.push(await readPage(doc,i));
-  let pricingIndex=pageData.findIndex((x,i)=>i>=5&&x.text.toUpperCase().includes('PREVENTIVO'));
+  let pricingIndex=pageData.findIndex((x,i)=>i>=5&&x.lines.some(l=>/^PREVENTIVO\s*$/i.test(l.text.trim())));
+  if(pricingIndex<0)pricingIndex=pageData.findIndex((x,i)=>i>=5&&x.text.toUpperCase().includes('PREVENTIVO'));
   if(pricingIndex<0)throw new Error('Non trovo la pagina PREVENTIVO in questo PDF.');
   const tpl=await S.get(S.ASSETS,'template'),storyCount=countRange(tpl?.storyRange||'1-7');
   const proposalStart=Math.min(storyCount,pricingIndex);
@@ -62,8 +63,8 @@ async function bestEffort(doc,fileName){
     const pg=await buildProposalFromPage(doc,i+1,pageData[i]);
     if(pg)p.pagine.push(pg);
   }
-  parsePricing(pageData[pricingIndex],p);
-  await parseContractBestEffort(pageData,p);
+  parsePricing(pageData[pricingIndex],p,warnings);
+  await parseContractBestEffort(pageData,p,warnings);
   if(!p.pagine.length)warnings.push('Non sono riuscito a ricostruire le pagine proposta.');
   if(!p.preventivo.voci.length)warnings.push('Non sono riuscito a ricostruire le singole voci del preventivo.');
   return{project:p,mode:'legacy',warnings};
@@ -81,26 +82,45 @@ function groupLines(items){
 }
 
 async function buildProposalFromPage(doc,pageNum,d){
-  const header=d.lines.find(l=>l.y>790&&/PROPOSTA/i.test(l.text));
-  const titleLine=d.lines.find(l=>l.y>700&&l.y<790&&!/PROPOSTA/i.test(l.text));
-  const low=d.lines.filter(l=>l.y<95&&!/PREVENTIVO/i.test(l.text));
+  const usable=d.lines.filter(l=>!/^LA NOSTRA PROPOSTA PER VOI$/i.test(l.text.trim()));
+  const header=d.lines.find(l=>/LA NOSTRA PROPOSTA PER VOI/i.test(l.text));
+  const titleLine=usable.find(l=>isLikelyTitle(l.text));
+  const title=titleLine?.text||'';
+  const priceLines=usable.filter(l=>l!==titleLine&&isPriceLike(l.text));
+  const narrativeLines=usable.filter(l=>l!==titleLine&&!isPriceLike(l.text)&&!/^PREVENTIVO$/i.test(l.text)&&!/^BONUS$/i.test(l.text));
+  const narrative=cleanNarrative(narrativeLines.map(x=>x.text).join(' '));
+  const priceText=priceLines.map(x=>x.text).join('\n').trim();
   const boxes=await imageBoxes(d.page);
   const rendered=boxes.length?await renderPage(d.page,1.5):null;
   const images=[];
   for(const box of boxes){
     if(box.w<70||box.h<55||box.w>540||box.h>700)continue;
-    const dataUrl=cropPdfBox(rendered,box);
-    if(!dataUrl)continue;
+    const dataUrl=cropPdfBox(rendered,box);if(!dataUrl)continue;
     const desc=captionForBox(d.items,box);
     images.push({id:S.uuid(),dataUrl,descrizione:desc});
   }
-  if(!images.length){
-    const legacy=await legacyImageRegion(d.page);if(legacy)images.push({id:S.uuid(),dataUrl:legacy,descrizione:legacyCaption(d.lines)});
+  if(!images.length){const legacy=await legacyImageRegion(d.page);if(legacy)images.push({id:S.uuid(),dataUrl:legacy,descrizione:''})}
+  if(images.length&&narrative){
+    const hasDesc=images.some(im=>String(im.descrizione||'').trim());
+    if(!hasDesc)images[0].descrizione=narrative;
+    else if(!String(images[0].descrizione||'').trim())images[0].descrizione=narrative;
   }
-  const page={id:S.uuid(),sezione:header?.text||'LA NOSTRA PROPOSTA PER VOI',titolo:titleLine?.text||'',prezzoTesto:low.map(x=>x.text).join(' ').trim(),immagini:images};
-  if(!page.titolo&&!page.prezzoTesto&&!images.length)return null;
+  const page={id:S.uuid(),sezione:header?.text||'LA NOSTRA PROPOSTA PER VOI',titolo:title,prezzoTesto:priceText,immagini:images};
+  if(!page.titolo&&!page.prezzoTesto&&!images.length&&!narrative)return null;
   return page;
 }
+function isLikelyTitle(s){
+  s=String(s||'').trim();if(!s||isPriceLike(s)||s.length>90)return false;
+  const letters=(s.match(/[A-Za-zÀ-ÖØ-öø-ÿ]/g)||[]).length,upper=(s.match(/[A-ZÀ-ÖØ-Þ]/g)||[]).length;
+  return letters>=4&&upper/letters>.72;
+}
+function isPriceLike(s){
+  s=String(s||'').trim();
+  if(!s)return false;
+  if(/\bTOTALE\b|\bIVA\b/i.test(s))return false;
+  return /\d[\d.,]*\s*€|€\s*\d|\b(?:euro)\b/i.test(s)&&(/\bcad\.?\b/i.test(s)||/^\d+(?:[.,]\d+)?\s+/i.test(s)||/:\s*\d/i.test(s));
+}
+function cleanNarrative(s){return String(s||'').replace(/\s+/g,' ').replace(/^[-•*\s]+|[-•*\s]+$/g,'').trim()}
 
 async function imageBoxes(page){
   try{
@@ -123,42 +143,82 @@ async function renderPage(page,scale){const vp=page.getViewport({scale}),c=docum
 function cropPdfBox(r,b){if(!r)return'';const {canvas,scale,vp}=r,x=Math.max(0,Math.floor(b.x*scale)),y=Math.max(0,Math.floor(vp.height-(b.y+b.h)*scale)),w=Math.min(canvas.width-x,Math.ceil(b.w*scale)),h=Math.min(canvas.height-y,Math.ceil(b.h*scale));if(w<20||h<20)return'';const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(canvas,x,y,w,h,0,0,w,h);return c.toDataURL('image/jpeg',.88)}
 function captionForBox(items,b){
   const cx=b.x+b.w/2,minX=cx-Math.max(130,b.w*.7),maxX=cx+Math.max(130,b.w*.7),minY=b.y-65,maxY=b.y-3;
-  return groupLines(items.filter(it=>{const x=it.transform?.[4]||0,y=it.transform?.[5]||0;return x>=minX&&x<=maxX&&y>=minY&&y<=maxY})).map(x=>x.text).join(' ').trim();
+  return groupLines(items.filter(it=>{const x=it.transform?.[4]||0,y=it.transform?.[5]||0;return x>=minX&&x<=maxX&&y>=minY&&y<=maxY})).map(x=>x.text).filter(x=>!isPriceLike(x)).join(' ').trim();
 }
 async function legacyImageRegion(page){
   try{const r=await renderPage(page,1.3),b={x:50,y:350,w:W-100,h:350},u=cropPdfBox(r,b);return u||''}catch{return''}
 }
-function legacyCaption(lines){return lines.filter(l=>l.y>250&&l.y<350).map(l=>l.text).join(' ').trim()}
 
-function parsePricing(d,p){
-  const lines=d.lines.map(x=>x.text);let baseShown=null,labShown=null,vatShown=null;
+function parsePricing(d,p,warnings){
+  const lines=d.lines.map(x=>x.text.trim()).filter(Boolean),voci=[];
+  let totalBeforeVat=null,totalAfterVat=null,explicitVatPct=null;
   for(const line of lines){
-    const m=line.match(/^(.+?)\s*[·•]\s*([0-9.,]+)\s*[×x]\s*([^=]+?)\s*=\s*(.+)$/i);
-    if(m){const q=parseNumber(m[2]),unit=parseMoney(m[3]);if(q>=0&&Number.isFinite(unit))p.preventivo.voci.push({id:S.uuid(),descrizione:m[1].trim(),quantita:q,prezzoUnitario:unit});continue}
-    if(/^Subtotale\b/i.test(line))baseShown=parseMoney(line);
-    else if(/^Manodopera\b/i.test(line))labShown=parseMoney(line);
-    else if(/^IVA\b/i.test(line))vatShown=parseMoney(line);
-    else if(/^BONUS:/i.test(line)){const val=line.match(/\(valore\s+(.+?)\)/i);p.preventivo.bonusValue=val?parseMoney(val[1]):0;p.preventivo.bonusDesc=line.replace(/^BONUS:\s*/i,'').replace(/\s*\(valore.+?\)\s*$/i,'').trim()}
+    const modern=parseModernPricingLine(line),legacy=parseLegacyPricingLine(line),v=modern||legacy;
+    if(v){v.id=S.uuid();voci.push(v);continue}
+    let m=line.match(/\bIVA\s*(\d+(?:[.,]\d+)?)\s*%/i);if(m)explicitVatPct=parseNumber(m[1]);
+    m=line.match(/TOTALE\s*:\s*([\d.,]+)\s*€?\s*\+\s*IVA\s*=\s*([\d.,]+)\s*€?/i);if(m){totalBeforeVat=parseNumber(m[1]);totalAfterVat=parseNumber(m[2]);continue}
+    m=line.match(/^Subtotale\b.*?([\d.,]+)\s*€?/i);if(m)totalBeforeVat=parseNumber(m[1]);
   }
-  if(baseShown!=null&&labShown!=null&&baseShown>0)p.preventivo.manodoperaPct=Math.round(labShown/baseShown*1000)/10;
-  if(vatShown!=null){
-    const itemBase=p.preventivo.voci.reduce((a,v)=>a+S.num(v.quantita)*S.num(v.prezzoUnitario),0);
-    const vatBase=baseShown!=null&&labShown!=null?baseShown+labShown:itemBase;
-    if(vatBase>0)p.preventivo.ivaPct=Math.round(vatShown/vatBase*1000)/10;
+  p.preventivo.voci=voci;
+  const base=voci.reduce((a,v)=>a+S.num(v.quantita)*S.num(v.prezzoUnitario),0);
+  if(explicitVatPct!=null)p.preventivo.ivaPct=explicitVatPct;
+  else if(totalBeforeVat!=null&&totalAfterVat!=null&&totalBeforeVat>0){
+    const eff=Math.round(((totalAfterVat/totalBeforeVat)-1)*10000)/100;
+    if(Number.isFinite(eff)&&eff>=0&&eff<=100){p.preventivo.ivaPct=eff;warnings.push(`IVA non indicata in percentuale nel PDF: ricostruita dai totali come ${String(eff).replace('.',',')}%.`)}
+  }
+  if(totalBeforeVat!=null&&base>0&&Math.abs(totalBeforeVat-base)>.02)warnings.push(`La somma delle voci (${fmt(base)} €) non coincide con il totale ante IVA del PDF (${fmt(totalBeforeVat)} €). Controlla le righe importate.`);
+  const bi=lines.findIndex(x=>/^BONUS\s*$/i.test(x));
+  if(bi>=0){
+    const bonusRaw=lines.slice(bi+1).filter(x=>!/^LA NOSTRA PROPOSTA PER VOI$/i.test(x)).join(' ').replace(/\s+/g,' ').trim();
+    const vals=[...bonusRaw.matchAll(/(?:del\s+)?valore\s+di\s+([\d.,]+)\s*(?:€|euro)/gi)].map(m=>parseNumber(m[1]));
+    p.preventivo.bonusValue=vals.reduce((a,b)=>a+b,0);
+    p.preventivo.bonusDesc=bonusRaw.replace(/,?\s*(?:del\s+)?valore\s+di\s+[\d.,]+\s*(?:€|euro)/gi,'').replace(/\s+/g,' ').trim();
   }
 }
-function parseNumber(s){return Number(String(s).replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,''))||0}
+function parseModernPricingLine(line){
+  const m=line.match(/^(.+?)\s*[·•]\s*([0-9.,]+)\s*[×x]\s*([^=]+?)\s*=\s*(.+)$/i);if(!m)return null;
+  const q=parseNumber(m[2]),unit=parseMoney(m[3]);if(!(q>0)||!Number.isFinite(unit))return null;
+  return{descrizione:clean(m[1]),quantita:q,prezzoUnitario:unit};
+}
+function parseLegacyPricingLine(line){
+  line=String(line||'').replace(/\s+/g,' ').trim();if(!line||/^(?:PREVENTIVO|TOTALE|IVA|BONUS)\b/i.test(line))return null;
+  let m=line.match(/^(\d+(?:[.,]\d+)?)\s+(.+?)\s*\(\s*([\d.,]+)\s*€\s*cad\.?\s*\)\s*[:=]?\s*([\d.,]+)\s*€?\s*$/i);
+  if(m)return{descrizione:clean(m[2]),quantita:parseNumber(m[1]),prezzoUnitario:parseNumber(m[3])};
+  m=line.match(/^(\d+(?:[.,]\d+)?)\s+(.+?)\s*[:=]\s*([\d.,]+)\s*€\s*$/i);
+  if(m){const q=parseNumber(m[1]),tot=parseNumber(m[3]);return{descrizione:clean(m[2]),quantita:q,prezzoUnitario:q?Math.round(tot/q*100)/100:tot}}
+  m=line.match(/^(\d+(?:[.,]\d+)?)\s+(.+?)\s+([\d.,]+)\s*€\s*$/i);
+  if(m){const q=parseNumber(m[1]),tot=parseNumber(m[3]);return{descrizione:clean(m[2]),quantita:q,prezzoUnitario:q?Math.round(tot/q*100)/100:tot}}
+  m=line.match(/^(.+?)\s*[:=]\s*([\d.,]+)\s*€\s*$/i);
+  if(m)return{descrizione:clean(m[1]),quantita:1,prezzoUnitario:parseNumber(m[2])};
+  return null;
+}
+function parseNumber(s){return Number(String(s).replace(/\s/g,'').replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,''))||0}
 function parseMoney(s){const m=String(s).match(/-?[0-9][0-9.\s]*(?:,[0-9]{1,2})?/);return m?parseNumber(m[0]):NaN}
+function fmt(n){return Number(n||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})}
 
-async function parseContractBestEffort(pages,p){
-  if(pages.length<9)return;const contract=pages.slice(-9),first=contract[0],third=contract[2];
-  const all1=first.lines.map(x=>x.text).join(' '),all3=third.lines.map(x=>x.text).join(' ');
-  let m=all1.match(/(.+?)\s+e\s+(.+?)\s+qui\s+d[’']innanzi/i);if(m){p.dati.nomeSposa=clean(m[1]);p.dati.nomeSposo=clean(m[2])}
-  m=all3.match(/L[’']Evento è pianificato in data\s+(.+?)\s+presso:/i);if(m)p.dati.dataEvento=italianDateToIso(m[1]);
-  m=all3.match(/cerimonia presso\s+(.+?)(?=\s+ricevimento presso|\s+Il Responsabile|$)/i);if(m)p.dati.cerimonia=clean(m[1]);
-  m=all3.match(/ricevimento presso\s+(.+?)(?=\s+Il Responsabile|$)/i);if(m)p.dati.ricevimento=clean(m[1]);
-  m=all3.match(/Responsabile in loco è identificato nella persona di\s+(.+?),\s+reperibile/i);if(m)p.dati.responsabile=clean(m[1]);
-  m=all3.match(/numero\s+([+0-9 ()/-]{6,})/i);if(m)p.dati.telefono=clean(m[1]);
+async function parseContractBestEffort(pages,p,warnings){
+  if(pages.length<3)return;
+  const contractStart=pages.findIndex(x=>/CONTRATTO DI PRESTAZIONE DI SERVIZI/i.test(x.text));
+  const contract=contractStart>=0?pages.slice(contractStart):pages.slice(-9),first=contract[0]||pages[0],third=contract[2]||contract[0];
+  const firstText=first.lines.map(x=>x.text).join(' '),thirdText=third.lines.map(x=>x.text).join(' ');
+  const namesLine=first.lines.find(l=>/qui\s+d[’']innanzi/i.test(l.text)&&!/Redavid Sara|Floral Designer|Prestatrice/i.test(l.text));
+  if(namesLine){const raw=clean(namesLine.text.replace(/^[*•\-]\s*/,'').replace(/\s+qui\s+d[’']innanzi.*$/i,'')),m=raw.match(/^(.+?)\s+e\s+(.+)$/i);if(m){p.dati.nomeSposa=clean(m[1]);p.dati.nomeSposo=clean(m[2])}}
+  if(!p.dati.nomeSposa||!p.dati.nomeSposo){const m=firstText.match(/[•*]\s*([^*•]+?)\s+e\s+([^*•]+?)\s+qui\s+d[’']innanzi/i);if(m){p.dati.nomeSposa=clean(m[1]);p.dati.nomeSposo=clean(m[2])}}
+  let eventDate='',singleLocation='';
+  let m=firstText.match(/fissate\s+per\s+il\s+giorno\s+(.+?)\s+presso\s+(.+?)(?:;|\s+Le\s+nozze|$)/i);
+  if(m){eventDate=italianDateToIso(m[1]);singleLocation=clean(m[2])}
+  if(!eventDate){m=thirdText.match(/L[’']Evento\s+è\s+pianificato\s+in\s+data\s+(.+?)\s+presso\s*:/i);if(m)eventDate=italianDateToIso(m[1])}
+  p.dati.dataEvento=eventDate||p.dati.dataEvento||'';
+  m=thirdText.match(/cerimonia\s+presso\s+(.+?)(?=\s+ricevimento\s+presso|\s+Il\s+Responsabile|$)/i);if(m)p.dati.cerimonia=clean(m[1]);
+  m=thirdText.match(/ricevimento\s+presso\s+(.+?)(?=\s+Il\s+Responsabile|$)/i);if(m)p.dati.ricevimento=clean(m[1]);
+  if(!singleLocation){
+    const dateLine=third.lines.findIndex(l=>/L[’']Evento\s+è\s+pianificato/i.test(l.text));
+    if(dateLine>=0){for(let i=dateLine+1;i<Math.min(third.lines.length,dateLine+4);i++){const s=clean(third.lines[i].text.replace(/^[*•\-]\s*/,''));if(s&&!/Responsabile|reperibile/i.test(s)){singleLocation=s;break}}}
+  }
+  if(singleLocation){if(!p.dati.cerimonia)p.dati.cerimonia=singleLocation;if(!p.dati.ricevimento)p.dati.ricevimento=singleLocation}
+  m=thirdText.match(/Responsabile\s+in\s+loco\s+è\s+identificato\s+nella\s+persona\s+di\s+(.+?)(?:,\s*reperibile|\s+reperibile)/i);if(m){const v=clean(m[1]);p.dati.responsabile=/^_+$/.test(v)?'':v}
+  m=thirdText.match(/numero\s+([+0-9 ()/-]{6,})/i);if(m){const v=clean(m[1]);p.dati.telefono=/^[_\s-]+$/.test(v)?'':v}
+  if(!p.dati.nomeSposa||!p.dati.nomeSposo)warnings.push('Nomi degli sposi non riconosciuti automaticamente dal contratto.');
 }
 function clean(s){return String(s||'').replace(/\s+/g,' ').replace(/^[,.;:\s]+|[,.;:\s]+$/g,'').trim()}
 function italianDateToIso(s){const months={gennaio:1,febbraio:2,marzo:3,aprile:4,maggio:5,giugno:6,luglio:7,agosto:8,settembre:9,ottobre:10,novembre:11,dicembre:12},m=clean(s).toLowerCase().match(/(\d{1,2})\s+([a-zà]+)\s+(\d{4})/);if(!m||!months[m[2]])return'';return`${m[3]}-${String(months[m[2]]).padStart(2,'0')}-${String(+m[1]).padStart(2,'0')}`}
