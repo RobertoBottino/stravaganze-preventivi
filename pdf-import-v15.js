@@ -141,7 +141,11 @@ function parsePricing(d,p){
     else if(/^BONUS:/i.test(line)){const val=line.match(/\(valore\s+(.+?)\)/i);p.preventivo.bonusValue=val?parseMoney(val[1]):0;p.preventivo.bonusDesc=line.replace(/^BONUS:\s*/i,'').replace(/\s*\(valore.+?\)\s*$/i,'').trim()}
   }
   if(baseShown!=null&&labShown!=null&&baseShown>0)p.preventivo.manodoperaPct=Math.round(labShown/baseShown*1000)/10;
-  if(vatShown!=null){const subtotal=p.preventivo.voci.reduce((a,v)=>a+S.num(v.quantita)*S.num(v.prezzoUnitario),0);if(subtotal>0)p.preventivo.ivaPct=Math.round(vatShown/subtotal*1000)/10}
+  if(vatShown!=null){
+    const itemBase=p.preventivo.voci.reduce((a,v)=>a+S.num(v.quantita)*S.num(v.prezzoUnitario),0);
+    const vatBase=baseShown!=null&&labShown!=null?baseShown+labShown:itemBase;
+    if(vatBase>0)p.preventivo.ivaPct=Math.round(vatShown/vatBase*1000)/10;
+  }
 }
 function parseNumber(s){return Number(String(s).replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,''))||0}
 function parseMoney(s){const m=String(s).match(/-?[0-9][0-9.\s]*(?:,[0-9]{1,2})?/);return m?parseNumber(m[0]):NaN}
