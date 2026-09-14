@@ -36,7 +36,7 @@ async function proposal(o,m,f,b){
    for(let col=0;col<rowItems.length;col++){
     const im=rowItems[col],x=single?(W-cellW)/2:margin+col*(cellW+gap),rowTop=top-row*rowStep,imgBottom=rowTop-imgH;
     try{const j=await o.embedJpg(data(im.dataUrl)),sc=Math.min(cellW/j.width,imgH/j.height),ww=j.width*sc,hh=j.height*sc;p.drawRectangle({x,y:imgBottom,width:cellW,height:imgH,borderColor:lineColor,borderWidth:.6,color:rgb(1,1,1)});p.drawImage(j,{x:x+(cellW-ww)/2,y:imgBottom+(imgH-hh)/2,width:ww,height:hh})}catch(e){console.warn('Immagine proposta non leggibile',e)}
-    const legacy=row===0&&col===0&&!String(im.descrizione||'').trim()?m.testo:'';const caption=String(im.descrizione||legacy||'').trim();
+    const legacy=pageIndex===0&&row===0&&col===0&&!String(im.descrizione||'').trim()?m.testo:'';const caption=String(im.descrizione||legacy||'').trim();
     if(caption){const fit=fittedLines(f,caption,9.5,7.8,cellW,4);let cy=imgBottom-14;for(const ln of fit.lines){p.drawText(ln,{x,y:cy,size:fit.size,font:f,color:dark});cy-=11}}
    }
   }
