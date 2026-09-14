@@ -1,4 +1,4 @@
-const CACHE='sf-preventivi-v14';
+const CACHE='sf-preventivi-v15';
 const CORE=['./','./index.html','./styles.css?v=14','./proposal-v14.css?v=14','./db.js?v=14','./pdf.js?v=9','./contract-v10.js?v=10','./pdf-v10.js?v=14','./app.js?v=14','./manifest.webmanifest?v=14','./icons/icon.svg'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
