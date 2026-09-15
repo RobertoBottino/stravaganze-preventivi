@@ -20,23 +20,49 @@ function rng(s,m){const a=[];String(s).split(',').forEach(q=>{const z=q.trim().m
 function page(o){const p=o.addPage([W,H]);p.drawRectangle({x:0,y:0,width:W,height:H,color:paper});p.drawRectangle({x:0,y:H-56,width:W,height:56,color:rgb(.66,.74,.57)});return p}
 function txt(p,s,x,y,n,f,c=dark,w=480,l=n*1.35){const lines=wrap(f,String(s||''),n,w);for(const z of lines){p.drawText(z,{x,y,size:n,font:f,color:c});y-=l}return y}
 function center(p,s,y,n,f,c=dark){p.drawText(s,{x:(W-f.widthOfTextAtSize(s,n))/2,y,size:n,font:f,color:c})}
-function wrap(f,s,n,w){const a=String(s||'').split(/\s+/).filter(Boolean),o=[];let q='';for(const z of a){const v=q?q+' '+z:z;if(q&&f.widthOfTextAtSize(v,n)>w){o.push(q);q=z}else q=v}if(q)o.push(q);return o}
+function wrap(f,s,n,w){const paras=String(s||'').split(/\n+/);const out=[];for(const para of paras){const a=para.split(/\s+/).filter(Boolean);let q='';for(const z of a){const v=q?q+' '+z:z;if(q&&f.widthOfTextAtSize(v,n)>w){out.push(q);q=z}else q=v}if(q)out.push(q)}return out}
 function fittedLines(f,s,start,min,w,maxLines){let n=start,lines=wrap(f,s,n,w);while(n>min&&lines.length>maxLines){n-=.25;lines=wrap(f,s,n,w)}if(lines.length>maxLines){lines=lines.slice(0,maxLines);let last=lines[maxLines-1];while(last.length&&f.widthOfTextAtSize(last+'…',n)>w)last=last.slice(0,-1);lines[maxLines-1]=last.replace(/[\s,.;:!?-]+$/,'')+'…'}return{size:n,lines}}
+function introLayout(f,text){
+ let size=10.5,lines=wrap(f,text,size,W-130);
+ if(lines.length>8){size=9.5;lines=wrap(f,text,size,W-130)}
+ if(lines.length>12){size=8.7;lines=wrap(f,text,size,W-130)}
+ return{size,lines,lineH:size*1.38}
+}
+function splitChunks(images,firstCap){
+ if(!images.length)return[[]];
+ const out=[],rest=images.slice();
+ if(firstCap===0)out.push([]);else out.push(rest.splice(0,firstCap));
+ while(rest.length)out.push(rest.splice(0,MAX_IMAGES_PER_PAGE));
+ return out
+}
 async function proposal(o,m,f,b){
  const images=Array.isArray(m.immagini)?m.immagini:[];
- const chunks=images.length?Array.from({length:Math.ceil(images.length/MAX_IMAGES_PER_PAGE)},(_,i)=>images.slice(i*MAX_IMAGES_PER_PAGE,(i+1)*MAX_IMAGES_PER_PAGE)):[[]];
+ const intro=String(m.testoIntro||m.testo||'').trim();
+ const il=intro?introLayout(f,intro):{size:10.5,lines:[],lineH:14.5};
+ const firstCap=!intro?MAX_IMAGES_PER_PAGE:il.lines.length<=2?6:il.lines.length<=7?4:il.lines.length<=12?2:0;
+ const chunks=splitChunks(images,firstCap);
  for(let pageIndex=0;pageIndex<chunks.length;pageIndex++){
-  const p=page(o),chunk=chunks[pageIndex];
+  const p=page(o),chunk=chunks[pageIndex],introPage=pageIndex===0&&intro;
   center(p,(m.sezione||'LA NOSTRA PROPOSTA PER VOI').toUpperCase(),H-35,13,b);
   if(m.titolo)center(p,m.titolo.toUpperCase(),750,15,b);
-  if(!chunk.length){let y=675;if(m.testo)y=txt(p,m.testo,65,y,11,f,dark,W-130,15)-8;if(m.prezzoTesto)txt(p,m.prezzoTesto,65,y,11,b,sage,W-130,15);continue}
-  const margin=55,gap=18,cellW=(W-margin*2-gap)/2,imgH=145,rowStep=205,top=710;
+  let introBottom=720;
+  if(introPage){
+    let y=718;
+    for(const ln of il.lines){const tw=f.widthOfTextAtSize(ln,il.size);p.drawText(ln,{x:(W-tw)/2,y,size:il.size,font:f,color:dark});y-=il.lineH}
+    introBottom=y;
+  }
+  if(!chunk.length){
+    if(!images.length&&m.prezzoTesto){const fit=fittedLines(b,m.prezzoTesto,10.5,8.5,W-130,4);let y=Math.max(80,introBottom-24);for(const ln of fit.lines){const tw=b.widthOfTextAtSize(ln,fit.size);p.drawText(ln,{x:(W-tw)/2,y,size:fit.size,font:b,color:sage});y-=12}}
+    continue
+  }
+  const margin=55,gap=18,cellW=(W-margin*2-gap)/2,imgH=145,rowStep=205;
+  const top=introPage?Math.min(690,introBottom-22):710;
   for(let row=0;row<Math.ceil(chunk.length/2);row++){
    const rowItems=chunk.slice(row*2,row*2+2),single=rowItems.length===1;
    for(let col=0;col<rowItems.length;col++){
     const im=rowItems[col],x=single?(W-cellW)/2:margin+col*(cellW+gap),rowTop=top-row*rowStep,imgBottom=rowTop-imgH;
     try{const j=await o.embedJpg(data(im.dataUrl)),sc=Math.min(cellW/j.width,imgH/j.height),ww=j.width*sc,hh=j.height*sc;p.drawRectangle({x,y:imgBottom,width:cellW,height:imgH,borderColor:lineColor,borderWidth:.6,color:rgb(1,1,1)});p.drawImage(j,{x:x+(cellW-ww)/2,y:imgBottom+(imgH-hh)/2,width:ww,height:hh})}catch(e){console.warn('Immagine proposta non leggibile',e)}
-    const legacy=pageIndex===0&&row===0&&col===0&&!String(im.descrizione||'').trim()?m.testo:'';const caption=String(im.descrizione||legacy||'').trim();
+    const caption=String(im.descrizione||'').trim();
     if(caption){const fit=fittedLines(f,caption,9.5,7.8,cellW,4);let cy=imgBottom-14;for(const ln of fit.lines){p.drawText(ln,{x,y:cy,size:fit.size,font:f,color:dark});cy-=11}}
    }
   }
