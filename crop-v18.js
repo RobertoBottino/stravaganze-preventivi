@@ -45,7 +45,7 @@ async function openCropper(src,{title='Ritaglia immagine',allowOriginal=true}={}
     function viewportSize(){
       const mobile=window.matchMedia('(max-width:700px)').matches;
       const maxW=Math.min(window.innerWidth-(mobile?24:90),760);
-      const maxH=Math.min(window.innerHeight*(mobile?.43:.52),560);
+      const maxH=Math.min(window.innerHeight*(mobile ? .43 : .52),560);
       let w=maxW,h=w/ratio;if(h>maxH){h=maxH;w=h*ratio}w=Math.max(160,w);h=Math.max(160/Math.max(ratio,.1),h);return{w,h};
     }
     function clamp(){const mx=Math.max(0,(displayW-viewport.clientWidth)/2),my=Math.max(0,(displayH-viewport.clientHeight)/2);offsetX=Math.max(-mx,Math.min(mx,offsetX));offsetY=Math.max(-my,Math.min(my,offsetY))}
@@ -68,7 +68,7 @@ async function openCropper(src,{title='Ritaglia immagine',allowOriginal=true}={}
     const stop=e=>{if(e.pointerId===pointer)pointer=null};viewport.addEventListener('pointerup',stop);viewport.addEventListener('pointercancel',stop);
     backdrop.querySelector('.sf-apply-crop').onclick=()=>{
       const scale=baseScale*userZoom,left=(viewport.clientWidth-displayW)/2+offsetX,top=(viewport.clientHeight-displayH)/2+offsetY;
-      let sx=Math.max(0,-left/scale),sy=Math.max(0,-top/scale),sw=Math.min(img.naturalWidth-sx,viewport.clientWidth/scale),sh=Math.min(img.naturalHeight-sy,viewport.clientHeight/scale);
+      const sx=Math.max(0,-left/scale),sy=Math.max(0,-top/scale),sw=Math.min(img.naturalWidth-sx,viewport.clientWidth/scale),sh=Math.min(img.naturalHeight-sy,viewport.clientHeight/scale);
       const maxSide=1800,outScale=Math.min(1,maxSide/Math.max(sw,sh)),cw=Math.max(1,Math.round(sw*outScale)),ch=Math.max(1,Math.round(sh*outScale)),c=document.createElement('canvas');c.width=cw;c.height=ch;const ctx=c.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,cw,ch);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,sx,sy,sw,sh,0,0,cw,ch);finish(c.toDataURL('image/jpeg',.9));
     };
     requestAnimationFrame(()=>render(true));
