@@ -72,6 +72,14 @@ async function proposal(o,m,f,b){
  }
  while(notePos<nl.lines.length){const p=page(o);center(p,(m.sezione||'LA NOSTRA PROPOSTA PER VOI').toUpperCase(),H-35,13,b);if(m.titolo)center(p,m.titolo.toUpperCase(),750,15,b);const r=drawCenteredBlock(p,nl.lines.slice(notePos),705,nl.size,b,sage,nl.lineH,62);if(!r.used)break;notePos+=r.used}
 }
-async function pricing(o,p,t,f,b){const g=page(o);center(g,'PREVENTIVO',H-35,13,b);let y=735,k=1+(S.num(p.preventivo.manodoperaPct)+S.num(p.preventivo.weddingPlannerPct))/100;for(const v of p.preventivo.voci||[]){const q=S.num(v.quantita),u=S.round(S.num(v.prezzoUnitario)*k),r=S.round(q*S.num(v.prezzoUnitario)*k);y=txt(g,(v.descrizione||'Voce')+' · '+(v.quantita||0)+' × '+S.euro(u)+' = '+S.euro(r),55,y,11,f,dark,W-110,16);if(y<260)y=735}y-=12;g.drawLine({start:{x:55,y},end:{x:W-55,y},thickness:1,color:rgb(.82,.82,.78)});y-=26;for(const z of [['Subtotale',t.taxable],['IVA',t.vat]]){g.drawText(z[0],{x:55,y,size:11,font:f});g.drawText(S.euro(z[1]),{x:400,y,size:11,font:b});y-=20}g.drawText('TOTALE',{x:55,y:y-4,size:15,font:b,color:dark});g.drawText(S.euro(t.total),{x:385,y:y-4,size:15,font:b,color:dark});y-=42;g.drawText('Caparra 30%: '+S.euro(t.deposit)+' · Saldo 70%: '+S.euro(t.balance),{x:55,y,size:11,font:b,color:sage});if(p.preventivo.bonusDesc){y-=28;txt(g,'BONUS: '+p.preventivo.bonusDesc+(S.num(p.preventivo.bonusValue)>0?' (valore '+S.euro(p.preventivo.bonusValue)+')':''),55,y,11,b,sage,W-110,16)}}
+async function pricing(o,p,t,f,b){
+ const g=page(o);center(g,'PREVENTIVO',H-35,13,b);let y=735,k=1+(S.num(p.preventivo.manodoperaPct)+S.num(p.preventivo.weddingPlannerPct))/100;
+ for(const v of p.preventivo.voci||[]){const q=S.num(v.quantita),u=S.round(S.num(v.prezzoUnitario)*k),r=S.round(q*S.num(v.prezzoUnitario)*k);y=txt(g,(v.descrizione||'Voce')+' · '+(v.quantita||0)+' × '+S.euro(u)+' = '+S.euro(r),55,y,11,f,dark,W-110,16);if(y<260)y=735}
+ y-=12;g.drawLine({start:{x:55,y},end:{x:W-55,y},thickness:1,color:rgb(.82,.82,.78)});y-=26;
+ const summary=[['Subtotale',t.taxable]];if(S.num(p.preventivo.ivaPct)>0)summary.push(['IVA',t.vat]);
+ for(const z of summary){g.drawText(z[0],{x:55,y,size:11,font:f});g.drawText(S.euro(z[1]),{x:400,y,size:11,font:b});y-=20}
+ g.drawText('TOTALE',{x:55,y:y-4,size:15,font:b,color:dark});g.drawText(S.euro(t.total),{x:385,y:y-4,size:15,font:b,color:dark});y-=42;
+ g.drawText('Caparra 30%: '+S.euro(t.deposit)+' · Saldo 70%: '+S.euro(t.balance),{x:55,y,size:11,font:b,color:sage});if(p.preventivo.bonusDesc){y-=28;txt(g,'BONUS: '+p.preventivo.bonusDesc+(S.num(p.preventivo.bonusValue)>0?' (valore '+S.euro(p.preventivo.bonusValue)+')':''),55,y,11,b,sage,W-110,16)}
+}
 function data(u){const s=String(u).split(',')[1]||'',b=atob(s),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a}
 })();
