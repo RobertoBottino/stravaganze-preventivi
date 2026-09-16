@@ -65,7 +65,7 @@ function findPricingPage(pages){
   let i=pages.findIndex((x,n)=>n>=5&&x.lines.some(l=>/^PREVENTIVO\s*$/i.test(l.text.trim())));if(i>=0)return i;
   i=pages.findIndex((x,n)=>n>=5&&x.lines.some(l=>/^LA NOSTRA MIGLIORE OFFERTA\s*$/i.test(l.text.trim())));if(i>=0)return i;
   i=pages.findIndex((x,n)=>n>=5&&/\bTOTALE\s*:?[\s€]*[\d.,]+/i.test(x.text)&&/(CAPARRA|ACCONTO|RIMANENTE|SALDO)/i.test(x.text));if(i>=0)return i;
-  return pages.findIndex((x,n)=>n>=5&&/\bTOTALE\b/i.test(x.text)&&x.lines.filter(l=>moneyAtEnd(l.text)!=null).length>=4);
+  return pages.findIndex((x,n)=>n>=5&&/\bTOTALE\b/i.test(x.text)&&x.lines.filter(l=>lastMoney(l.text)!=null).length>=4);
 }
 
 async function readPage(doc,n){
@@ -87,14 +87,12 @@ async function buildProposalFromPage(d){
     const dataUrl=cropPdfBox(rendered,box);if(dataUrl)images.push({id:S.uuid(),dataUrl,descrizione:''});
   }
   if(!images.length){const legacy=await legacyImageRegion(d.page);if(legacy)images.push({id:S.uuid(),dataUrl:legacy,descrizione:''})}
-  // Per i PDF legacy preserviamo TUTTO il testo della pagina invece di tentare di
-  // indovinare didascalie e prezzi: è molto più sicuro e non perde righe.
   const allText=contentLines.map(x=>x.text).filter(Boolean).join('\n').trim();
   const pg={id:S.uuid(),sezione:header?.text||'LA NOSTRA PROPOSTA PER VOI',titolo,testoIntro:'',prezzoTesto:allText,immagini:images};
   if(!pg.titolo&&!pg.prezzoTesto&&!images.length)return null;return pg;
 }
 function isLikelyTitle(s){
-  s=String(s||'').trim();if(!s||s.length>95||moneyAtEnd(s)!=null)return false;
+  s=String(s||'').trim();if(!s||s.length>95||lastMoney(s)!=null)return false;
   const letters=(s.match(/[A-Za-zÀ-ÖØ-öø-ÿ]/g)||[]).length,upper=(s.match(/[A-ZÀ-ÖØ-Þ]/g)||[]).length;
   return letters>=4&&upper/letters>.70;
 }
@@ -142,25 +140,30 @@ function parsePricing(d,p,warnings){
   if(deposit!=null&&sourceTotal>0&&Math.abs(deposit-sourceTotal*.30)>.05)warnings.push(`La caparra indicata nel PDF (${fmt(deposit)} €) non corrisponde al 30% del totale. Il valore originale è stato conservato nei dati di importazione, ma il modello attuale ricalcola caparra e saldo.`);
 }
 function parseOfferItem(line){
-  const total=moneyAtEnd(line);if(total==null||!(total>=0))return null;
+  const money=lastMoney(line);if(!money||!(money.value>=0))return null;
   if(/\b(TOTALE|CAPARRA|ACCONTO|RIMANENTE|SALDO|IVA)\b/i.test(line))return null;
-  let raw=line.replace(/\s*[:]?\s*[\d.,]+\s*€\s*(?:cad\.?|cadauno|cadauna)?\s*$/i,'').trim();
-  let qty=1,expr=null,m=raw.match(/^n\.?\s*((?:\d+\s*\+\s*)*\d+)\s+/i);
-  if(m){expr=m[1];qty=expr.split('+').map(Number).reduce((a,b)=>a+b,0)||1;raw=raw.slice(m[0].length).trim()}
+  let raw=(line.slice(0,money.start)+' '+line.slice(money.end)).replace(/\bcad\.?\b|cadaun[oa]/ig,' ').replace(/\s+/g,' ').trim();
+  let qty=1,m=raw.match(/^n\.?\s*((?:\d+\s*\+\s*)*\d+)\s+/i);
+  if(m){qty=m[1].split('+').map(x=>Number(x.trim())).reduce((a,b)=>a+b,0)||1;raw=raw.slice(m[0].length).trim()}
   else {m=raw.match(/^(\d+)\s+(?=[A-Za-zÀ-ÖØ-öø-ÿ])/);if(m){qty=Number(m[1])||1;raw=raw.slice(m[0].length).trim()}}
-  const isCad=/\bcad\.?\b|cadaun[oa]/i.test(line),unit=isCad?total:S.round(total/qty);
+  const isCad=/\bcad\.?\b|cadaun[oa]/i.test(line),unit=isCad?money.value:S.round(money.value/qty);
   raw=raw.replace(/\s+/g,' ').replace(/^[-–—:;,.\s]+|[-–—:;,.\s]+$/g,'').trim();
   if(!raw)return null;return{descrizione:raw,quantita:qty,prezzoUnitario:unit};
 }
-function moneyAtEnd(s){const m=String(s||'').match(/([\d.]+(?:,[0-9]{1,2})?|[\d,]+(?:\.[0-9]{1,2})?)\s*€\s*(?:cad\.?|cadaun[oa])?\s*$/i);return m?parseNumber(m[1]):null}
+function lastMoney(s){
+  const re=/([\d.]+(?:,[0-9]{1,2})?|[\d,]+(?:\.[0-9]{1,2})?)\s*€/gi;let m,last=null;
+  while((m=re.exec(String(s||''))))last={value:parseNumber(m[1]),start:m.index,end:re.lastIndex};return last;
+}
 function parseNumber(v){let s=String(v??'').replace(/\s/g,'').replace(/€/g,'');if(!s)return NaN;if(s.includes(',')&&s.includes('.')){if(s.lastIndexOf(',')>s.lastIndexOf('.'))s=s.replace(/\./g,'').replace(',','.');else s=s.replace(/,/g,'')}else if(s.includes(','))s=s.replace(',','.');return Number(s)}
 function fmt(n){return Number(n||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})}
 
 function parseContractBestEffort(pages,p,warnings){
   const contractPages=pages.filter(x=>/CONTRATTO DI PRESTAZIONE DI SERVIZI|qui d[’']innanzi|L.Evento è pianificato|Corrispettivo/i.test(x.text));
   const all=contractPages.map(x=>x.lines.map(l=>l.text).join(' ')).join(' ');
-  let m=all.match(/(?:\*\s*)?([^.;]{1,70}?)\s+e\s+([^.;]{1,70}?)\s+qui d[’']innanzi/i);
-  if(m){p.dati.nomeSposa=cleanName(m[1]);p.dati.nomeSposo=cleanName(m[2])}
+  for(const pg of contractPages){for(const l of pg.lines){
+    const nm=l.text.match(/^\*?\s*([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'’ -]{0,45}?)\s+e\s+([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'’ -]{0,45}?)\s+qui d[’']innanzi\s*$/i);
+    if(nm){p.dati.nomeSposa=cleanName(nm[1]);p.dati.nomeSposo=cleanName(nm[2]);break}
+  }if(p.dati.nomeSposa&&p.dati.nomeSposo)break}
   const dateRe='(\\d{1,2}\\s+[A-Za-zÀ-ÖØ-öø-ÿ]+\\s+\\d{4}|\\d{1,2}[\\/.-]\\d{1,2}[\\/.-]\\d{4})';
   const pre=new RegExp('fissate per il giorno\\s+'+dateRe+'\\s+presso\\s+(.+?)\\s+e\\s+(?:il ricevimento|la location)\\s+(.+?)(?:;|\\.|Le nozze)','i').exec(all);
   if(pre){p.dati.dataEvento=toIsoDate(pre[1]);p.dati.cerimonia=cleanVenue(pre[2]);p.dati.ricevimento=cleanVenue(pre[3])}
@@ -176,7 +179,7 @@ function parseContractBestEffort(pages,p,warnings){
   if(!p.dati.nomeSposa||!p.dati.nomeSposo)warnings.push('Nomi degli sposi non riconosciuti con certezza dal contratto.');
   if(!p.dati.cerimonia||!p.dati.ricevimento)warnings.push('Una o entrambe le location non sono state riconosciute con certezza.');
 }
-function cleanName(s){return String(s||'').replace(/^\*\s*/,'').replace(/\s+/g,' ').trim().split(/\s+/).slice(-5).join(' ')}
+function cleanName(s){return String(s||'').replace(/^[*•\s]+/,'').replace(/\s+/g,' ').trim()}
 function cleanVenue(s){return String(s||'').replace(/^[*•\s]+/,'').replace(/^la location\s+/i,'').replace(/\s+/g,' ').replace(/[;,.\s]+$/,'').trim()}
 function toIsoDate(s){
   s=String(s||'').trim();let m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);if(m)return`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
