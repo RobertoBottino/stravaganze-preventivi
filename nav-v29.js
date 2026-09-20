@@ -5,8 +5,9 @@ const STATUS={bozza:'Bozza',inviato:'Inviato',confermato:'Confermato',perso:'Per
 document.addEventListener('DOMContentLoaded',()=>{
  const menuBtn=$('menuBtn'),menu=$('appMenuDrawer'),archive=$('archiveDrawer');if(!menuBtn||!menu)return;
  const normalize=p=>{p=S.migrateProject(p);if(!p.status||!STATUS[p.status])p.status='bozza';return p};
- const closeMenu=()=>{menu.classList.remove('open');setTimeout(()=>menu.hidden=true,180)};
- const openMenu=()=>{menu.hidden=false;requestAnimationFrame(()=>menu.classList.add('open'));refreshStatus()};
+ let menuReturnFocus=null;
+ const closeMenu=()=>{menu.classList.remove('open');menuBtn.setAttribute('aria-expanded','false');document.body.classList.remove('sf-nav-open');setTimeout(()=>{menu.hidden=true;menuReturnFocus?.focus?.();menuReturnFocus=null},180)};
+ const openMenu=()=>{menuReturnFocus=document.activeElement;menu.hidden=false;menuBtn.setAttribute('aria-expanded','true');document.body.classList.add('sf-nav-open');requestAnimationFrame(()=>menu.classList.add('open'));refreshStatus();setTimeout(()=>$('closeMenu')?.focus(),40)};
  const closeArchive=()=>archive.hidden=true;
  const formatDate=iso=>{if(!iso)return'Data non inserita';const m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}/${m[2]}/${m[1]}`:iso};
  const formatUpdated=iso=>{if(!iso)return'';try{return new Intl.DateTimeFormat('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(iso))}catch{return''}};
@@ -23,7 +24,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   card.querySelector('[data-delete]').onclick=async()=>{if(!confirm('Eliminare definitivamente questa bozza?'))return;await S.del(S.PROJECTS,id);archiveCache=archiveCache.filter(x=>x.id!==id);if(localStorage.getItem('sf-last')===id)localStorage.removeItem('sf-last');drawArchive()}
  })}
  menuBtn.onclick=openMenu;$('closeMenu').onclick=closeMenu;menu.onclick=e=>{if(e.target===menu)closeMenu()};
- $('navArchive').onclick=()=>{closeMenu();openArchive()};$('navNew').onclick=()=>{closeMenu();$('newBtn').click()};$('navImportPdf').onclick=()=>{closeMenu();$('importPdfFile').click()};$('navImportBackup').onclick=()=>{closeMenu();$('importFile').click()};$('navBackup').onclick=()=>{closeMenu();$('backupBtn').click()};$('navTemplate').onclick=()=>{closeMenu();setTimeout(()=>$('templateSection')?.scrollIntoView({behavior:'smooth'}),80)};$('navSettings').onclick=()=>{closeMenu();setTimeout(()=>$('settingsSection')?.scrollIntoView({behavior:'smooth'}),80)};$('navInstall').onclick=()=>{closeMenu();$('installBtn').click()};$('navHelp').onclick=()=>{closeMenu();$('helpModal').hidden=false};$('closeHelp').onclick=()=>$('helpModal').hidden=true;
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!menu.hidden)closeMenu();else if(!archive.hidden)closeArchive();else if(!$('helpModal')?.hidden)$('helpModal').hidden=true}});
+ $('navArchive').onclick=()=>{closeMenu();openArchive()};$('navNew').onclick=()=>{closeMenu();$('newBtn').click()};$('navGenerate').onclick=()=>{closeMenu();setTimeout(()=>$('finalSection')?.scrollIntoView({behavior:'smooth',block:'start'}),80)};$('navImportPdf').onclick=()=>{closeMenu();$('importPdfFile').click()};$('navImportBackup').onclick=()=>{closeMenu();$('importFile').click()};$('navBackup').onclick=()=>{closeMenu();$('backupBtn').click()};$('navTemplate').onclick=()=>{closeMenu();setTimeout(()=>$('templateSection')?.scrollIntoView({behavior:'smooth'}),80)};$('navSettings').onclick=()=>{closeMenu();setTimeout(()=>$('settingsSection')?.scrollIntoView({behavior:'smooth'}),80)};$('navInstall').onclick=()=>{closeMenu();$('installBtn').click()};$('navHelp').onclick=()=>{closeMenu();$('helpModal').hidden=false};$('closeHelp').onclick=()=>$('helpModal').hidden=true;
  $('archiveBtn').onclick=openArchive;$('closeArchive').onclick=closeArchive;archive.onclick=e=>{if(e.target===archive)closeArchive()};$('archiveSearch').oninput=drawArchive;$('archiveFilters').querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{archiveFilter=b.dataset.filter;$('archiveFilters').querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));drawArchive()});
  const observer=new MutationObserver(()=>refreshStatus());if($('projectTitle'))observer.observe($('projectTitle'),{childList:true,subtree:true});refreshStatus();
 });
