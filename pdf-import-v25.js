@@ -74,22 +74,100 @@ async function readPage(doc,n){
 }
 function groupLines(items){
   const rows=[];
-  for(const it of items){const x=it.transform?.[4]||0,y=it.transform?.[5]||0;let r=rows.find(q=>Math.abs(q.y-y)<2.5);if(!r){r={y,items:[]};rows.push(r)}r.items.push({x,str:String(it.str||'')})}
-  rows.sort((a,b)=>b.y-a.y);return rows.map(r=>({y:r.y,text:r.items.sort((a,b)=>a.x-b.x).map(z=>z.str).join(' ').replace(/\s+/g,' ').trim()})).filter(x=>x.text)
+  for(const it of items){
+    const x=it.transform?.[4]||0,y=it.transform?.[5]||0,w=Math.abs(Number(it.width)||0);
+    let r=rows.find(q=>Math.abs(q.y-y)<2.5);if(!r){r={y,items:[]};rows.push(r)}
+    r.items.push({x,w,str:String(it.str||'')})
+  }
+  rows.sort((a,b)=>b.y-a.y);
+  return rows.map(r=>{
+    const parts=r.items.sort((a,b)=>a.x-b.x),text=parts.map(z=>z.str).join(' ').replace(/\s+/g,' ').trim();
+    const xMin=Math.min(...parts.map(z=>z.x)),xMax=Math.max(...parts.map(z=>z.x+(z.w||Math.max(4,z.str.length*4))));
+    return{y:r.y,xMin,xMax,text}
+  }).filter(x=>x.text)
 }
 
 async function buildProposalFromPage(d){
   const header=d.lines.find(l=>/LA NOSTRA PROPOSTA PER VOI/i.test(l.text)),usable=d.lines.filter(l=>l!==header),titleLine=usable.find(l=>isLikelyTitle(l.text)),title=titleLine?.text||'';
   const contentLines=usable.filter(l=>l!==titleLine&&!/^PREVENTIVO$/i.test(l.text)&&!/^LA NOSTRA MIGLIORE OFFERTA$/i.test(l.text));
-  const boxes=await imageBoxes(d.page),rendered=boxes.length?await renderPage(d.page,1.55):null,images=[];
+  const rawBoxes=await imageBoxes(d.page),boxes=rawBoxes.filter(box=>box.w>=65&&box.h>=50&&box.w<=545&&box.h<=720);
+  const rendered=boxes.length?await renderPage(d.page,1.55):null,images=[];
   for(const box of boxes){
-    if(box.w<65||box.h<50||box.w>545||box.h>720)continue;
     const dataUrl=cropPdfBox(rendered,box);if(dataUrl)images.push({id:S.uuid(),dataUrl,descrizione:''});
   }
-  if(!images.length){const legacy=await legacyImageRegion(d.page);if(legacy)images.push({id:S.uuid(),dataUrl:legacy,descrizione:''})}
-  const allText=contentLines.map(x=>x.text).filter(Boolean).join('\n').trim();
-  const pg={id:S.uuid(),sezione:header?.text||'LA NOSTRA PROPOSTA PER VOI',titolo:title,testoIntro:'',prezzoTesto:allText,immagini:images};
-  if(!pg.titolo&&!pg.prezzoTesto&&!images.length)return null;return pg;
+  let layout;
+  if(images.length)layout=splitProposalTextByLayout(contentLines,boxes.slice(0,images.length),images);
+  else{
+    const legacy=await legacyImageRegion(d.page);if(legacy)images.push({id:S.uuid(),dataUrl:legacy,descrizione:''});
+    layout=splitProposalTextWithoutGeometry(contentLines,images);
+  }
+  const pg={
+    id:S.uuid(),
+    sezione:header?.text||'LA NOSTRA PROPOSTA PER VOI',
+    titolo:title,
+    testoIntro:layout.intro,
+    prezzoTesto:layout.price,
+    immagini:images
+  };
+  if(!pg.titolo&&!pg.testoIntro&&!pg.prezzoTesto&&!images.length)return null;
+  return pg;
+}
+function splitProposalTextByLayout(lines,boxes,images){
+  const intro=[],price=[],captions=images.map(()=>[]);
+  if(!boxes.length)return splitProposalTextWithoutGeometry(lines,images);
+  const top=Math.max(...boxes.map(b=>b.y+b.h));
+  for(const line of lines){
+    const t=String(line.text||'').trim();if(!t)continue;
+    const lx=Number.isFinite(line.xMin)?line.xMin:0,rx=Number.isFinite(line.xMax)?line.xMax:W;
+    const lw=Math.max(1,rx-lx),cx=(lx+rx)/2;
+
+    let bestCaption=-1,bestCaptionDist=Infinity;
+    for(let i=0;i<boxes.length;i++){
+      const b=boxes[i],ov=Math.max(0,Math.min(rx,b.x+b.w)-Math.max(lx,b.x)),overlap=ov/Math.max(1,Math.min(lw,b.w));
+      const dy=line.y-b.y;
+      if(overlap>=.30&&dy<=55&&dy>=-190){
+        const dist=Math.abs(dy);if(dist<bestCaptionDist){bestCaption=i;bestCaptionDist=dist}
+      }
+    }
+    if(bestCaption>=0){captions[bestCaption].push(t);continue}
+
+    if(line.y>top+4){intro.push(t);continue}
+
+    let isSide=false;
+    for(const b of boxes){
+      const vertical=line.y>=b.y-8&&line.y<=b.y+b.h+8;if(!vertical)continue;
+      const ov=Math.max(0,Math.min(rx,b.x+b.w)-Math.max(lx,b.x)),ratio=ov/lw;
+      const horizontalGap=cx<b.x?b.x-cx:(cx>b.x+b.w?cx-(b.x+b.w):0);
+      if(ratio<.45&&horizontalGap<180){isSide=true;break}
+    }
+    if(isSide){intro.push(t);continue}
+
+    if(isLikelyCaptionText(t)&&images.length){
+      const nearest=nearestImageForLine(line,boxes);
+      if(nearest>=0)captions[nearest].push(t);else price.push(t);
+    }else intro.push(t);
+  }
+  captions.forEach((parts,i)=>{if(parts.length&&images[i])images[i].descrizione=parts.join('\n').trim()});
+  return{intro:intro.join('\n').trim(),price:price.join('\n').trim()};
+}
+function splitProposalTextWithoutGeometry(lines,images){
+  const intro=[],price=[];
+  for(const line of lines){const t=String(line.text||'').trim();if(!t)continue;(isLikelyCaptionText(t)?price:intro).push(t)}
+  if(images.length&&price.length){images[0].descrizione=price.join('\n').trim();return{intro:intro.join('\n').trim(),price:''}}
+  return{intro:intro.join('\n').trim(),price:price.join('\n').trim()}
+}
+function nearestImageForLine(line,boxes){
+  let best=-1,score=Infinity;
+  const lx=Number.isFinite(line.xMin)?line.xMin:0,rx=Number.isFinite(line.xMax)?line.xMax:W,cx=(lx+rx)/2;
+  boxes.forEach((b,i)=>{
+    const bx=b.x+b.w/2,dy=line.y<b.y?b.y-line.y:(line.y>b.y+b.h?line.y-(b.y+b.h):0),dx=Math.abs(cx-bx)*.20,s=dy+dx;
+    if(s<score){score=s;best=i}
+  });
+  return best
+}
+function isLikelyCaptionText(s){
+  s=String(s||'');
+  return /€|\beuro\b|\bcad\.?\b|cadaun[oa]|\bconsegna\b|\btrasporto\b|\bmontaggio\b|\bnoleggio\b|\bda portare\b|\bocchiello\b|\bbouquet\b/i.test(s)
 }
 function isLikelyTitle(s){
   s=String(s||'').trim();if(!s||s.length>95||lastMoney(s)!=null)return false;
