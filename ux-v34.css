@@ -1,0 +1,326 @@
+/* UX/UI refresh v34 — Stravaganze Floreali
+   Responsive targets: desktop, iPhone 390/393px, Pixel 6a 412px.
+   Loaded last so it can safely refine older layout rules without changing app logic. */
+:root{
+  --sf-green:#536345;
+  --sf-green-2:#6f805f;
+  --sf-sage:#a8bc92;
+  --sf-sage-soft:#eef3e9;
+  --sf-sage-pale:#f6f8f3;
+  --sf-ivory:#fbfaf6;
+  --sf-cream:#f3f0e8;
+  --sf-line:#d9ddcf;
+  --sf-text:#283025;
+  --sf-muted:#697064;
+  --sf-danger:#9f4742;
+  --sf-shadow:0 12px 34px rgba(51,65,45,.075);
+  --sf-shadow-soft:0 5px 18px rgba(51,65,45,.055);
+  --sage:var(--sf-sage);
+  --sage2:var(--sf-green);
+  --dark:var(--sf-green);
+  --paper:var(--sf-ivory);
+  --cream:var(--sf-cream);
+  --line:var(--sf-line);
+  --text:var(--sf-text);
+  --muted:var(--sf-muted);
+  --danger:var(--sf-danger);
+  --shadow:var(--sf-shadow);
+}
+html{scroll-behavior:smooth;background:var(--sf-cream)}
+body{
+  color:var(--sf-text);
+  background:
+    radial-gradient(circle at 8% 0%,rgba(168,188,146,.14),transparent 30rem),
+    linear-gradient(180deg,#faf9f5 0%,#f3f0e8 100%);
+}
+body.sf-nav-open{overflow:hidden}
+button,.btn,input,textarea,select{font-family:inherit}
+button,.btn{border-radius:12px;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease,transform .08s ease}
+button:focus-visible,.btn:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{
+  outline:3px solid rgba(83,99,69,.22);
+  outline-offset:2px;
+}
+button.primary,.btn.primary,.primary{background:var(--sf-green);border-color:var(--sf-green);color:#fff}
+button.primary:hover,.btn.primary:hover{background:#46563c;border-color:#46563c}
+button.secondary,.btn.secondary{background:#fff;border-color:#cbd3c3;color:var(--sf-green)}
+button.ghost,.btn.ghost{color:var(--sf-green)}
+input,textarea,select{
+  border-color:#d2d7cc;
+  background:#fff;
+  color:var(--sf-text);
+  box-shadow:0 1px 0 rgba(44,54,39,.02);
+}
+input:hover,textarea:hover,select:hover{border-color:#b8c2af}
+input:focus,textarea:focus,select:focus{border-color:var(--sf-green);box-shadow:0 0 0 3px rgba(83,99,69,.11)}
+::placeholder{color:#949a90;opacity:1}
+
+/* Header */
+.topbar{
+  min-height:68px;
+  padding:10px max(18px,env(safe-area-inset-right)) 10px max(18px,env(safe-area-inset-left));
+  background:rgba(251,250,246,.94);
+  border-bottom:1px solid rgba(83,99,69,.13);
+  box-shadow:0 2px 16px rgba(51,65,45,.035);
+  backdrop-filter:blur(16px) saturate(1.05);
+}
+.brand-mark{
+  background:var(--sf-green);
+  border-radius:50%;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);
+}
+.brand strong{color:var(--sf-green);letter-spacing:.01em}
+.brand span{color:var(--sf-muted)}
+.menu-trigger{
+  border-color:rgba(83,99,69,.22);
+  background:var(--sf-sage-soft);
+  color:var(--sf-green);
+  box-shadow:none;
+}
+.menu-trigger:hover,.menu-trigger:focus-visible{background:#e5ecde;border-color:rgba(83,99,69,.36)}
+
+/* Project summary */
+.project-head{
+  width:min(1180px,calc(100% - 32px));
+  padding-top:34px;
+  padding-bottom:20px;
+}
+.project-head h1{color:var(--sf-green);line-height:1.05;letter-spacing:-.025em}
+.project-head p{font-size:14px}
+.eyebrow{color:var(--sf-green-2);letter-spacing:.2em}
+.content,main{width:min(1180px,calc(100% - 32px))}
+.card{
+  border:1px solid rgba(83,99,69,.13);
+  background:rgba(255,255,255,.90);
+  border-radius:18px;
+  box-shadow:var(--sf-shadow-soft);
+}
+.card:hover{border-color:rgba(83,99,69,.18)}
+.section-title h2{color:var(--sf-green);letter-spacing:-.01em}
+.section-title p{font-size:14px;line-height:1.55}
+.step{
+  background:var(--sf-sage-soft);
+  color:var(--sf-green);
+  border:1px solid rgba(83,99,69,.08);
+}
+
+/* Forms */
+.field span{color:#4e5a47;font-size:12px;letter-spacing:.015em}
+.field small{line-height:1.45}
+.form-grid{row-gap:16px}
+textarea{line-height:1.45}
+.bonus-box,.totals-card{background:var(--sf-sage-pale);border:1px solid rgba(83,99,69,.10)}
+.total-cell.grand{color:var(--sf-green)}
+.pricing-wrap{border-color:rgba(83,99,69,.15)}
+.pricing-table th{background:#f6f7f3;color:#66705f}
+.pricing-table tr:last-child td{border-bottom:0}
+
+/* Proposal editor */
+.proposal-card{
+  border-color:rgba(83,99,69,.15);
+  border-radius:16px;
+  background:#fff;
+  box-shadow:0 5px 20px rgba(51,65,45,.035);
+}
+.proposal-head>b{color:var(--sf-green)}
+.proposal-images-head small{line-height:1.4}
+.proposal-upload{border-color:#cbd4c3;color:var(--sf-green)}
+.proposal-upload:hover{background:var(--sf-sage-pale)}
+.proposal-image-card{border-color:rgba(83,99,69,.15)}
+.proposal-caption textarea{line-height:1.45}
+
+/* Main app menu: light, editorial, consistent with the public site */
+.nav-backdrop{background:rgba(30,37,27,.44);backdrop-filter:blur(4px)}
+.nav-panel{
+  width:min(390px,92vw);
+  background:var(--sf-ivory);
+  color:var(--sf-text);
+  border-right:1px solid rgba(83,99,69,.13);
+  box-shadow:24px 0 70px rgba(31,39,28,.20);
+  padding:max(18px,env(safe-area-inset-top)) 16px max(22px,env(safe-area-inset-bottom));
+}
+.nav-head{
+  border-bottom:1px solid rgba(83,99,69,.13);
+  margin-bottom:10px;
+  padding:4px 4px 14px;
+}
+.nav-head strong{color:var(--sf-green);font-family:Georgia,serif;font-size:20px}
+.nav-close{
+  width:44px;height:44px;
+  background:var(--sf-sage-soft);
+  color:var(--sf-green);
+  border:1px solid rgba(83,99,69,.12);
+}
+.nav-section-label{
+  padding:14px 12px 5px;
+  color:#7a8274;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+}
+.nav-list{gap:4px}
+.nav-item{
+  min-height:50px;
+  gap:13px;
+  color:#34402f;
+  padding:12px 13px;
+  border-radius:11px;
+}
+.nav-item:hover,.nav-item:focus-visible{background:#edf2e8}
+.nav-item .nav-icon{
+  display:grid;
+  place-items:center;
+  width:30px;height:30px;
+  border-radius:9px;
+  background:#edf2e8;
+  color:var(--sf-green);
+  font-size:16px;
+}
+.nav-item.nav-primary{
+  margin:5px 0 2px;
+  background:var(--sf-green);
+  color:#fff;
+}
+.nav-item.nav-primary:hover,.nav-item.nav-primary:focus-visible{background:#46563c}
+.nav-item.nav-primary .nav-icon{background:rgba(255,255,255,.13);color:#fff}
+.nav-separator{background:rgba(83,99,69,.11);margin:8px 0}
+.nav-note{
+  margin-top:10px;
+  padding:12px;
+  border-radius:12px;
+  background:#f0f3ec;
+  color:#66705f;
+}
+.menu-current-status{padding:6px 0 0}
+.status-pill{border:1px solid rgba(83,99,69,.10)}
+
+/* Archive */
+.drawer-backdrop{background:rgba(30,37,27,.44)}
+.drawer-backdrop .drawer{
+  background:var(--sf-ivory);
+  box-shadow:-24px 0 70px rgba(31,39,28,.18);
+}
+.drawer-head{
+  background:rgba(251,250,246,.97)!important;
+  border-bottom:1px solid rgba(83,99,69,.11);
+  margin:0 -4px 12px;
+  padding:10px 4px 12px;
+}
+.drawer-head h2{color:var(--sf-green);margin:0 0 3px}
+.drawer-head small{color:var(--sf-muted)}
+.drawer-head button{width:44px;height:44px;padding:0;border-radius:50%}
+.archive-search{border-color:#ccd4c4}
+.archive-filters{scrollbar-width:none}
+.archive-filters::-webkit-scrollbar{display:none}
+.archive-filters button.active{background:var(--sf-green);border-color:var(--sf-green)}
+.archive-card{border-color:rgba(83,99,69,.15);box-shadow:var(--sf-shadow-soft)}
+.archive-card h3{color:var(--sf-green)}
+.archive-total{color:var(--sf-green)}
+.archive-actions .primary-mini{background:var(--sf-green);border-color:var(--sf-green)}
+.archive-actions button{min-height:42px}
+
+/* Modals */
+.modal-backdrop{background:rgba(30,37,27,.50)}
+.modal-backdrop .modal{
+  border:1px solid rgba(83,99,69,.14);
+  box-shadow:0 28px 80px rgba(31,39,28,.25);
+}
+.modal h3{color:var(--sf-green)}
+.help-row{background:var(--sf-sage-pale);border:1px solid rgba(83,99,69,.08)}
+
+/* Sections reached from hamburger menu must not hide behind sticky header. */
+#settingsSection,#templateSection,#finalSection{scroll-margin-top:86px}
+
+/* Desktop */
+@media(min-width:1100px){
+  .card{padding:26px 28px;margin:18px 0}
+  .section-title h2{font-size:25px}
+  .project-actions .btn{min-width:112px}
+  .pricing-table th,.pricing-table td{padding:11px 10px}
+}
+
+/* Tablet / compact desktop */
+@media(max-width:900px){
+  .project-head,.content,main{width:calc(100% - 24px)}
+  .card{padding:20px}
+}
+
+/* iPhone + Pixel 6a family */
+@media(max-width:700px){
+  .topbar{
+    min-height:62px;
+    flex-wrap:nowrap;
+    padding:max(8px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) 8px max(10px,env(safe-area-inset-left));
+  }
+  .brand-with-menu{gap:8px;min-width:0}
+  .brand-mark{width:38px;height:38px;flex-basis:38px;font-size:13px}
+  .brand strong{font-size:13px;line-height:1.15}
+  .top-actions{flex:0 0 auto}
+  .save-state,#saveState{font-size:11px!important;white-space:nowrap}
+  .menu-trigger{width:44px;height:44px;flex-basis:44px}
+  .project-head,.content,main{width:calc(100% - 18px)}
+  .project-head{padding:20px 0 12px}
+  .project-head h1{font-size:clamp(28px,8.2vw,36px);line-height:1.05}
+  .project-head p{font-size:13px;line-height:1.4}
+  .card{padding:16px;margin:11px 0;border-radius:16px}
+  .section-title{margin-bottom:16px}
+  .section-title h2{font-size:20px}
+  .section-title p{font-size:13px}
+  .step{width:28px;height:28px;font-size:13px}
+  button,.btn{min-height:46px}
+  .field input,.field textarea,.field select{font-size:16px}
+  .field span{font-size:12px}
+  .proposal-head{align-items:flex-start}
+  .proposal-head>b{padding-top:9px}
+  .mini-actions button{width:44px;min-width:44px;padding:0}
+  .proposal-image-preview{height:min(62vw,270px)!important}
+  .proposal-images-head{align-items:stretch;flex-direction:column}
+  .proposal-upload{width:100%;min-height:48px}
+  .totals-card{gap:8px}
+  .total-cell{min-width:0}
+  .total-cell b{overflow-wrap:anywhere}
+  .nav-panel{width:min(390px,94vw);padding-left:12px;padding-right:12px}
+  .nav-head{padding-left:6px;padding-right:6px}
+  .nav-item{min-height:52px;font-size:15px}
+  .nav-section-label{padding-left:14px}
+  .drawer-backdrop .drawer{padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
+  .archive-tools{position:sticky;top:58px;z-index:1;background:var(--sf-ivory);padding:7px 0 8px}
+  .archive-card{padding:14px}
+  .archive-card-top{gap:8px}
+  .archive-total{font-size:15px}
+  .archive-actions{display:grid;grid-template-columns:1fr 1fr}
+  .archive-actions button{width:100%}
+  .modal-backdrop{padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+  .modal-backdrop .modal{border-radius:18px;padding:20px 16px}
+}
+
+/* Pixel 6a CSS viewport is typically ~412px wide. */
+@media(min-width:400px) and (max-width:430px){
+  .card{padding:17px}
+  .project-head h1{font-size:34px}
+  .pricing-table td{grid-template-columns:96px minmax(0,1fr)}
+  .proposal-image-preview{height:255px!important}
+}
+
+/* Common iPhone widths 375–393px. */
+@media(max-width:399px){
+  .topbar{gap:6px}
+  .brand-mark{display:none}
+  .brand strong{max-width:150px;white-space:normal!important}
+  .project-head h1{font-size:30px}
+  .card{padding:14px}
+  .section-title h2{font-size:19px}
+  .pricing-table td{grid-template-columns:88px minmax(0,1fr)}
+  .archive-actions{grid-template-columns:1fr}
+  .archive-actions button{min-height:46px}
+  .nav-panel{width:96vw}
+}
+
+/* Small legacy iPhones: preserve reachability rather than squeeze controls. */
+@media(max-width:350px){
+  .brand strong{max-width:120px;font-size:12px}
+  .save-state,#saveState{display:none!important}
+  .totals-card{grid-template-columns:1fr}
+  .pricing-table td{grid-template-columns:1fr}
+  .pricing-table td::before{margin-bottom:-3px}
+}
