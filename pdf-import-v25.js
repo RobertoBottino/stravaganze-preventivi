@@ -88,7 +88,7 @@ async function buildProposalFromPage(d){
   }
   if(!images.length){const legacy=await legacyImageRegion(d.page);if(legacy)images.push({id:S.uuid(),dataUrl:legacy,descrizione:''})}
   const allText=contentLines.map(x=>x.text).filter(Boolean).join('\n').trim();
-  const pg={id:S.uuid(),sezione:header?.text||'LA NOSTRA PROPOSTA PER VOI',titolo,testoIntro:'',prezzoTesto:allText,immagini:images};
+  const pg={id:S.uuid(),sezione:header?.text||'LA NOSTRA PROPOSTA PER VOI',titolo:title,testoIntro:'',prezzoTesto:allText,immagini:images};
   if(!pg.titolo&&!pg.prezzoTesto&&!images.length)return null;return pg;
 }
 function isLikelyTitle(s){
@@ -116,44 +116,94 @@ async function legacyImageRegion(page){try{const r=await renderPage(page,1.3);re
 
 function parsePricing(d,p,warnings){
   const lines=d.lines.map(x=>x.text.trim()).filter(Boolean),voci=[];
-  let sourceTotal=null,subtotal=null,vatAmount=null,explicitVatPct=null,deposit=null,firstAdvance=null,remaining=null;
+  let sourceBeforeVat=null,sourceTotal=null,subtotal=null,vatAmount=null,explicitVatPct=null,deposit=null,firstAdvance=null,remaining=null;
+  const totalIdx=lines.findIndex(x=>/^TOTALE\b/i.test(x));
+  const itemLines=totalIdx>=0?lines.slice(0,totalIdx):lines;
   for(const line of lines){
-    let m=line.match(/^TOTALE\s*:?\s*([\d.,]+)\s*€?/i);if(m){sourceTotal=parseNumber(m[1]);continue}
-    m=line.match(/^Subtotale\b.*?([\d.,]+)\s*€?/i);if(m){subtotal=parseNumber(m[1]);continue}
+    let m=line.match(/^TOTALE\s*:?\s*([\d.,]+)\s*€?\s*\+\s*IVA(?:\s*(\d+(?:[.,]\d+)?)\s*%)?\s*=\s*([\d.,]+)\s*€?/i);
+    if(m){sourceBeforeVat=parseNumber(m[1]);if(m[2])explicitVatPct=parseNumber(m[2]);sourceTotal=parseNumber(m[3]);continue}
+    m=line.match(/^TOTALE\s*:?\s*([\d.,]+)\s*€?/i);if(m){sourceTotal=parseNumber(m[1]);continue}
+    m=line.match(/^Subtotale\b.*?([\d.,]+)\s*€?/i);if(m){subtotal=parseNumber(m[1]);sourceBeforeVat=subtotal;continue}
     m=line.match(/^IVA(?:\s*(\d+(?:[.,]\d+)?)\s*%)?\s*:?\s*([\d.,]+)?\s*€?/i);if(m){if(m[1])explicitVatPct=parseNumber(m[1]);if(m[2])vatAmount=parseNumber(m[2]);continue}
     m=line.match(/^CAPARRA(?:\s+CONFIRMATORIA)?\s*:?\s*([\d.,]+)\s*€?/i);if(m){deposit=parseNumber(m[1]);continue}
     m=line.match(/^PRIMO\s+ACCONTO\s*:?\s*([\d.,]+)\s*€?/i);if(m){firstAdvance=parseNumber(m[1]);continue}
     m=line.match(/^(?:RIMANENTE|SALDO)\s*:?\s*([\d.,]+)\s*€?/i);if(m){remaining=parseNumber(m[1]);continue}
-    if(/^(?:PREVENTIVO|LA NOSTRA MIGLIORE OFFERTA|BONUS)\b/i.test(line))continue;
+  }
+  for(const line of itemLines){
+    if(/^(?:PREVENTIVO|LA NOSTRA MIGLIORE OFFERTA|BONUS|OMAGGIO)\b/i.test(line))continue;
     const v=parseOfferItem(line);if(v){v.id=S.uuid();voci.push(v)}
   }
-  p.preventivo.voci=voci;
-  const base=S.round(voci.reduce((a,v)=>a+S.num(v.quantita)*S.num(v.prezzoUnitario),0));
+
+  const bonusIdx=lines.findIndex(x=>/^BONUS!?\s*$/i.test(x));
+  let bonusRaw='',bonusValue=0,bonusDesc='';
+  if(bonusIdx>=0){
+    bonusRaw=lines.slice(bonusIdx+1).filter(x=>!/^LA NOSTRA PROPOSTA PER VOI$/i.test(x)).join(' ').replace(/\s+/g,' ').trim();
+    const vals=[...bonusRaw.matchAll(/(?:del\s+)?valore\s+di\s+([\d.,]+)\s*(?:€|euro)/gi)].map(m=>parseNumber(m[1])).filter(Number.isFinite);
+    bonusValue=vals.reduce((a,b)=>a+b,0);
+    bonusDesc=bonusRaw
+      .replace(/\bOMAGGIO!?\b/gi,' ')
+      .replace(/,?\s*(?:del\s+)?valore\s+di\s+[\d.,]+\s*(?:€|euro)/gi,' ')
+      .replace(/\s+/g,' ').trim();
+    p.preventivo.bonusValue=bonusValue;
+    p.preventivo.bonusDesc=bonusDesc;
+  }
+
   const hasVat=lines.some(x=>/^IVA\b/i.test(x)||/\+\s*IVA\b/i.test(x));
+  if(!hasVat&&sourceBeforeVat==null&&sourceTotal!=null)sourceBeforeVat=sourceTotal;
+
+  let base=S.round(voci.reduce((a,v)=>a+S.num(v.quantita)*S.num(v.prezzoUnitario),0));
+  const expectedBase=sourceBeforeVat;
+  if(expectedBase!=null&&base>expectedBase+.01&&bonusValue>0){
+    const diff=S.round(base-expectedBase),bn=normText(bonusDesc);
+    const idx=voci.findIndex(v=>{
+      const vn=normText(v.descrizione);
+      return Math.abs(S.num(v._lineTotal)-diff)<.02&&(bn.includes(vn)||vn.includes(bn));
+    });
+    if(idx>=0){
+      voci.splice(idx,1);
+      base=S.round(voci.reduce((a,v)=>a+S.num(v.quantita)*S.num(v.prezzoUnitario),0));
+      warnings.push('Una voce barrata/omaggiata presente anche nel blocco BONUS è stata esclusa dal totale.');
+    }
+  }
+
+  p.preventivo.voci=voci.map(v=>({id:v.id,descrizione:v.descrizione,quantita:v.quantita,prezzoUnitario:v.prezzoUnitario}));
   if(explicitVatPct!=null)p.preventivo.ivaPct=explicitVatPct;
-  else if(hasVat&&vatAmount!=null&&subtotal>0)p.preventivo.ivaPct=Math.round(vatAmount/subtotal*10000)/100;
-  else if(hasVat&&subtotal>0&&sourceTotal>0)p.preventivo.ivaPct=Math.round((sourceTotal/subtotal-1)*10000)/100;
+  else if(hasVat&&vatAmount!=null&&sourceBeforeVat>0)p.preventivo.ivaPct=Math.round(vatAmount/sourceBeforeVat*1000000)/10000;
+  else if(hasVat&&sourceBeforeVat>0&&sourceTotal>0)p.preventivo.ivaPct=Math.round(((sourceTotal/sourceBeforeVat)-1)*1000000)/10000;
   else if(!hasVat){p.preventivo.ivaPct=0;warnings.push('Nel riepilogo economico non è indicata IVA: il preventivo è stato importato con IVA 0%.')}
-  p.legacyImport={sourceTotal,deposit,firstAdvance,remaining,vatDetected:hasVat};
-  if(sourceTotal!=null&&base>0&&Math.abs(sourceTotal-base)>.05)warnings.push(`La somma delle voci ricostruite (${fmt(base)} €) non coincide con il TOTALE del PDF (${fmt(sourceTotal)} €). Controlla il riepilogo.`);
-  if(firstAdvance!=null)warnings.push(`Il PDF contiene un PRIMO ACCONTO di ${fmt(firstAdvance)} €: non è stato trasformato in una voce di preventivo. Il modello attuale usa caparra/saldo, quindi controlla le condizioni di pagamento prima di rigenerare il contratto.`);
-  if(deposit!=null&&sourceTotal>0&&Math.abs(deposit-sourceTotal*.30)>.05)warnings.push(`La caparra indicata nel PDF (${fmt(deposit)} €) non corrisponde al 30% del totale. Il valore originale è stato conservato nei dati di importazione, ma il modello attuale ricalcola caparra e saldo.`);
+
+  p.legacyImport={sourceBeforeVat,sourceTotal,deposit,firstAdvance,remaining,vatDetected:hasVat};
+  const compareTotal=sourceBeforeVat!=null?sourceBeforeVat:sourceTotal;
+  if(compareTotal!=null&&base>0&&Math.abs(compareTotal-base)>.05)warnings.push(\`La somma delle voci ricostruite (\${fmt(base)} €) non coincide con il totale ante IVA del PDF (\${fmt(compareTotal)} €). Controlla il riepilogo.\`);
+  if(firstAdvance!=null)warnings.push(\`Il PDF contiene un PRIMO ACCONTO di \${fmt(firstAdvance)} €: non è stato trasformato in una voce di preventivo. Il modello attuale usa caparra/saldo, quindi controlla le condizioni di pagamento prima di rigenerare il contratto.\`);
+  if(deposit!=null&&sourceTotal>0&&Math.abs(deposit-sourceTotal*.30)>.05)warnings.push(\`La caparra indicata nel PDF (\${fmt(deposit)} €) non corrisponde al 30% del totale. Il valore originale è stato conservato nei dati di importazione, ma il modello attuale ricalcola caparra e saldo.\`);
 }
 function parseOfferItem(line){
-  const money=lastMoney(line);if(!money||!(money.value>=0))return null;
+  const monies=moneyMatches(line);if(!monies.length)return null;
   if(/\b(TOTALE|CAPARRA|ACCONTO|RIMANENTE|SALDO|IVA)\b/i.test(line))return null;
-  let raw=(line.slice(0,money.start)+' '+line.slice(money.end)).replace(/\bcad\.?\b|cadaun[oa]/ig,' ').replace(/\s+/g,' ').trim();
+  const final=monies[monies.length-1];
+  let raw=(line.slice(0,final.start)+' '+line.slice(final.end)).replace(/\s+/g,' ').trim();
   let qty=1,m=raw.match(/^n\.?\s*((?:\d+\s*\+\s*)*\d+)\s+/i);
   if(m){qty=m[1].split('+').map(x=>Number(x.trim())).reduce((a,b)=>a+b,0)||1;raw=raw.slice(m[0].length).trim()}
   else {m=raw.match(/^(\d+)\s+(?=[A-Za-zÀ-ÖØ-öø-ÿ])/);if(m){qty=Number(m[1])||1;raw=raw.slice(m[0].length).trim()}}
-  const isCad=/\bcad\.?\b|cadaun[oa]/i.test(line),unit=isCad?money.value:S.round(money.value/qty);
+  let unitMoney=null;
+  for(const mm of monies.slice(0,-1)){
+    const tail=line.slice(mm.end,Math.min(line.length,mm.end+18));
+    if(/^\s*(?:cad\.?|cadaun[oa])/i.test(tail)){unitMoney=mm;break}
+  }
+  const unit=unitMoney?unitMoney.value:S.round(final.value/qty);
+  if(unitMoney)raw=raw.replace(/[\d.,]+\s*€\s*(?:cad\.?|cadaun[oa])/i,' ');
   raw=raw.replace(/\s+/g,' ').replace(/^[-–—:;,.\s]+|[-–—:;,.\s]+$/g,'').trim();
-  if(!raw)return null;return{descrizione:raw,quantita:qty,prezzoUnitario:unit};
+  if(!raw)return null;
+  return{descrizione:raw,quantita:qty,prezzoUnitario:unit,_lineTotal:final.value,_sourceLine:line};
 }
-function lastMoney(s){
-  const re=/([\d.]+(?:,[0-9]{1,2})?|[\d,]+(?:\.[0-9]{1,2})?)\s*€/gi;let m,last=null;
-  while((m=re.exec(String(s||''))))last={value:parseNumber(m[1]),start:m.index,end:re.lastIndex};return last;
+function moneyMatches(s){
+  const re=/([\d.]+(?:,[0-9]{1,2})?|[\d,]+(?:\.[0-9]{1,2})?)\s*€/gi,out=[];let m;
+  while((m=re.exec(String(s||''))))out.push({value:parseNumber(m[1]),start:m.index,end:re.lastIndex,raw:m[0]});
+  return out;
 }
+function lastMoney(s){const a=moneyMatches(s);return a.length?a[a.length-1]:null}
+function normText(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim()}
 function parseNumber(v){let s=String(v??'').replace(/\s/g,'').replace(/€/g,'');if(!s)return NaN;if(s.includes(',')&&s.includes('.')){if(s.lastIndexOf(',')>s.lastIndexOf('.'))s=s.replace(/\./g,'').replace(',','.');else s=s.replace(/,/g,'')}else if(s.includes(','))s=s.replace(',','.');return Number(s)}
 function fmt(n){return Number(n||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})}
 
@@ -165,11 +215,13 @@ function parseContractBestEffort(pages,p,warnings){
     if(nm){p.dati.nomeSposa=cleanName(nm[1]);p.dati.nomeSposo=cleanName(nm[2]);break}
   }if(p.dati.nomeSposa&&p.dati.nomeSposo)break}
   const dateRe='(\\d{1,2}\\s+[A-Za-zÀ-ÖØ-öø-ÿ]+\\s+\\d{4}|\\d{1,2}[\\/.-]\\d{1,2}[\\/.-]\\d{4})';
-  const pre=new RegExp('fissate per il giorno\\s+'+dateRe+'\\s+presso\\s+(.+?)\\s+e\\s+(?:il ricevimento|la location)\\s+(.+?)(?:;|\\.|Le nozze)','i').exec(all);
+  const pre=new RegExp('fissate per il giorno\\s+'+dateRe+'\\s+presso\\s+(?:la\\s+chiesa\\s+di\\s+)?(.+?)\\s+e\\s+(?:(?:il\\s+ricevimento)|(?:la\\s+location)|(?:in\\s+location))\\s+(.+?)(?:;|\\.|Le nozze)','i').exec(all);
   if(pre){p.dati.dataEvento=toIsoDate(pre[1]);p.dati.cerimonia=cleanVenue(pre[2]);p.dati.ricevimento=cleanVenue(pre[3])}
   if(!p.dati.dataEvento){const dm=new RegExp('(?:fissate per il giorno|pianificato in data)\\s+'+dateRe,'i').exec(all);if(dm)p.dati.dataEvento=toIsoDate(dm[1])}
   if(!p.dati.cerimonia||!p.dati.ricevimento){
     for(const pg of contractPages){for(const l of pg.lines){
+      const both=l.text.match(/^\*?\s*ricevimento\s+in\s+(.+?),\s*rito\s+in\s+(.+)$/i);
+      if(both){if(!p.dati.ricevimento)p.dati.ricevimento=cleanVenue(both[1]);if(!p.dati.cerimonia)p.dati.cerimonia=cleanVenue(both[2]);continue}
       if(!p.dati.cerimonia){const cm=l.text.match(/^\*?\s*cerimonia\s+(?:presso|nella|nel|in)\s+(.+)$/i);if(cm)p.dati.cerimonia=cleanVenue(cm[1])}
       if(!p.dati.ricevimento){const rm=l.text.match(/^\*?\s*ricevimento\s+(?:presso|nella|nel|in)\s+(.+)$/i);if(rm)p.dati.ricevimento=cleanVenue(rm[1])}
     }}
