@@ -174,9 +174,9 @@ function parsePricing(d,p,warnings){
 
   p.legacyImport={sourceBeforeVat,sourceTotal,deposit,firstAdvance,remaining,vatDetected:hasVat};
   const compareTotal=sourceBeforeVat!=null?sourceBeforeVat:sourceTotal;
-  if(compareTotal!=null&&base>0&&Math.abs(compareTotal-base)>.05)warnings.push(\`La somma delle voci ricostruite (\${fmt(base)} €) non coincide con il totale ante IVA del PDF (\${fmt(compareTotal)} €). Controlla il riepilogo.\`);
-  if(firstAdvance!=null)warnings.push(\`Il PDF contiene un PRIMO ACCONTO di \${fmt(firstAdvance)} €: non è stato trasformato in una voce di preventivo. Il modello attuale usa caparra/saldo, quindi controlla le condizioni di pagamento prima di rigenerare il contratto.\`);
-  if(deposit!=null&&sourceTotal>0&&Math.abs(deposit-sourceTotal*.30)>.05)warnings.push(\`La caparra indicata nel PDF (\${fmt(deposit)} €) non corrisponde al 30% del totale. Il valore originale è stato conservato nei dati di importazione, ma il modello attuale ricalcola caparra e saldo.\`);
+  if(compareTotal!=null&&base>0&&Math.abs(compareTotal-base)>.05)warnings.push(`La somma delle voci ricostruite (${fmt(base)} €) non coincide con il totale ante IVA del PDF (${fmt(compareTotal)} €). Controlla il riepilogo.`);
+  if(firstAdvance!=null)warnings.push(`Il PDF contiene un PRIMO ACCONTO di ${fmt(firstAdvance)} €: non è stato trasformato in una voce di preventivo. Il modello attuale usa caparra/saldo, quindi controlla le condizioni di pagamento prima di rigenerare il contratto.`);
+  if(deposit!=null&&sourceTotal>0&&Math.abs(deposit-sourceTotal*.30)>.05)warnings.push(`La caparra indicata nel PDF (${fmt(deposit)} €) non corrisponde al 30% del totale. Il valore originale è stato conservato nei dati di importazione, ma il modello attuale ricalcola caparra e saldo.`);
 }
 function parseOfferItem(line){
   const monies=moneyMatches(line);if(!monies.length)return null;
