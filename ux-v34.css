@@ -304,7 +304,8 @@ textarea{line-height:1.45}
 
 /* Common iPhone widths 375–393px. */
 @media(max-width:399px){
-  .topbar{gap:6px}
+  .topbar{gap:6px;align-items:center}
+  .top-actions{width:auto!important;display:flex!important;grid-template-columns:none!important;margin-left:auto!important}
   .brand-mark{display:none}
   .brand strong{max-width:150px;white-space:normal!important}
   .project-head h1{font-size:30px}
@@ -324,3 +325,7 @@ textarea{line-height:1.45}
   .pricing-table td{grid-template-columns:1fr}
   .pricing-table td::before{margin-bottom:-3px}
 }
+
+.archive-details span{display:flex;align-items:baseline;gap:7px;min-width:0}
+.archive-details .detail-label{flex:0 0 58px;color:#81887b;font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}
+.archive-details .detail-value{min-width:0;overflow-wrap:anywhere}
