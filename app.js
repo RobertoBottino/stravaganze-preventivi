@@ -11,7 +11,7 @@ const defs=[
  ['telefono','Telefono responsabile','tel']
 ];
 document.addEventListener('DOMContentLoaded',init);
-async function init(){wire();renderFields();const last=localStorage.getItem('sf-last');if(last)state=S.migrateProject((await S.get(S.PROJECTS,last))||state);renderAll();await renderTemplate();if('serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js?v=33').catch(console.warn)}
+async function init(){wire();renderFields();const last=localStorage.getItem('sf-last');if(last)state=S.migrateProject((await S.get(S.PROJECTS,last))||state);renderAll();await renderTemplate();if('serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js?v=34').catch(console.warn)}
 function wire(){
  $('newBtn').onclick=newProject;$('drawerNewBtn').onclick=newProject;$('archiveBtn').onclick=()=>{$('archiveDrawer').hidden=false;renderArchive()};$('closeArchive').onclick=()=>$('archiveDrawer').hidden=true;$('archiveDrawer').onclick=e=>{if(e.target===$('archiveDrawer'))$('archiveDrawer').hidden=true};
  $('installBtn').onclick=install;$('closeInstall').onclick=()=>$('installModal').hidden=true;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e});
