@@ -6,7 +6,7 @@ const FONT_ITALIC='https://cdn.jsdelivr.net/fontsource/fonts/ibm-plex-sans-conde
 const FONT_REGULAR='https://cdn.jsdelivr.net/fontsource/fonts/ibm-plex-sans-condensed@5.3.0/latin-400-normal.woff';
 const PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const RASTER_SCALE=2.4;
-const ERASE={13:[[127,324.8,505,344.5],[127,617,505,666]],15:[[92,305.5,500,324.8],[145,334.6,500,353.6],[145,363.1,500,382.1],[92,398.8,505,417.2],[92,425.8,505,444.3]],16:[[92,371.4,505,414.8],[112,590.7,505,637]],17:[[131,99,505,118],[128,486,515,504.7],[128,597.1,505,615.8]],21:[[92,94,240,112.5]]};
+const ERASE={13:[[127,324.8,505,344.5],[127,617,505,666]],15:[[92,305.5,500,324.8],[145,334.6,500,353.6],[145,363.1,500,382.1],[92,398.8,505,417.2],[92,425.8,505,444.3]],16:[[91,383,530,435],[112,590.7,505,637]],17:[[131,99,505,118],[128,486,515,504.7],[128,597.1,505,615.8]],21:[[92,94,240,112.5]]};
 S.appendContractV10=async(out,src,raw,p,t)=>{
  if(!window.pdfjsLib)throw new Error('Motore di rendering PDF non disponibile. Ricarica la pagina con connessione attiva.');
  const fonts=await loadFonts(out),italic=fonts.italic,regular=fonts.regular,pdfjs=window.pdfjsLib;pdfjs.GlobalWorkerOptions.workerSrc=PDFJS_WORKER;
@@ -24,7 +24,8 @@ S.appendContractV10=async(out,src,raw,p,t)=>{
  line(pages[15],[145,363.1,500,382.1,377.14],`ricevimento presso ${rec}`,regular,12,9.2);
  line(pages[15],[92,398.8,505,417.2,412.59],`Il Responsabile in loco è identificato nella persona di ${resp}, reperibile`,italic,12,9.1);
  line(pages[15],[92,425.8,505,444.3,439.60],`telefonicamente al seguente numero ${tel} a partire`,italic,12,9.2);
- wrapped(pages[16],[92,371.4,505,414.8],[385.05,407.3],`${totalNum} (${totalWords}) alle seguenti coordinate bancarie:`,italic,12,10.4,2);
+ line(pages[16],[93.7,383,522.5,407,400.66],`Il corrispettivo per l’Incarico affidato alla Prestatrice è pari ad Euro ${totalNum}`,italic,12,10.2);
+ line(pages[16],[93.7,411,522.5,435,428.42],`(${totalWords}) alle seguenti coordinate bancarie:`,italic,12,9.8);
  wrapped(pages[16],[112,590.7,505,637],[604.41,632.17],`ammontare pari ad Euro ${depNum} (${depWords}) entro e non oltre 7 giorni di calendario dalla firma del presente`,italic,12,10.2,2);
  line(pages[17],[131,99,505,118,112.96],`Euro ${balNum} (${balWords})`,italic,12,9.3);
  line(pages[17],[128,486,515,504.7,499.66],`(compreso) – che nel caso di specie è individuato nel giorno ${d8};`,italic,12,9.3);
