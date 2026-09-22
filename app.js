@@ -11,7 +11,60 @@ const defs=[
  ['telefono','Telefono responsabile','tel']
 ];
 document.addEventListener('DOMContentLoaded',init);
-async function init(){wire();renderFields();const last=localStorage.getItem('sf-last');if(last)state=S.migrateProject((await S.get(S.PROJECTS,last))||state);renderAll();await renderTemplate();if('serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js?v=38').catch(console.warn)}
+async function init(){wire();renderFields();const last=localStorage.getItem('sf-last');if(last)state=S.migrateProject((await S.get(S.PROJECTS,last))||state);renderAll();await renderTemplate();registerServiceWorkerAggressive().catch(console.warn)}
+
+async function registerServiceWorkerAggressive(){
+ if(!('serviceWorker'in navigator)||location.protocol==='file:')return;
+ const hadController=Boolean(navigator.serviceWorker.controller);
+ let shouldReload=hadController,reloading=false,lastCheck=0;
+
+ navigator.serviceWorker.addEventListener('controllerchange',async()=>{
+  if(!shouldReload||reloading)return;
+  reloading=true;
+  try{
+   if(saveTimer){clearTimeout(saveTimer);saveTimer=null;await save()}
+  }catch(e){console.warn('Salvataggio prima dell’aggiornamento non riuscito',e)}
+  const last=Number(sessionStorage.getItem('sf-sw-reload-at')||0);
+  if(Date.now()-last<5000)return;
+  sessionStorage.setItem('sf-sw-reload-at',String(Date.now()));
+  location.reload();
+ });
+
+ const reg=await navigator.serviceWorker.register('./sw.js?v=39',{updateViaCache:'none'});
+
+ const activateNow=worker=>{
+  if(!worker)return;
+  if(worker.state==='installed'&&navigator.serviceWorker.controller){
+   shouldReload=true;
+   worker.postMessage({type:'SKIP_WAITING'});
+  }
+ };
+
+ if(reg.waiting)activateNow(reg.waiting);
+ reg.addEventListener('updatefound',()=>{
+  const worker=reg.installing;
+  if(!worker)return;
+  worker.addEventListener('statechange',()=>activateNow(worker));
+ });
+
+ const check=async force=>{
+  const now=Date.now();
+  if(!force&&now-lastCheck<60000)return;
+  lastCheck=now;
+  try{
+   await reg.update();
+   if(reg.waiting)activateNow(reg.waiting);
+  }catch(e){console.warn('Controllo aggiornamento PWA non riuscito',e)}
+ };
+
+ // Check immediately, when the app returns to foreground, and when connectivity returns.
+ await check(true);
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')check(false)});
+ window.addEventListener('online',()=>check(true));
+
+ // Long-running desktop sessions also refresh periodically.
+ setInterval(()=>{if(document.visibilityState==='visible'&&navigator.onLine)check(false)},5*60*1000);
+}
 function wire(){
  $('newBtn').onclick=newProject;$('drawerNewBtn').onclick=newProject;$('archiveBtn').onclick=()=>{$('archiveDrawer').hidden=false;renderArchive()};$('closeArchive').onclick=()=>$('archiveDrawer').hidden=true;$('archiveDrawer').onclick=e=>{if(e.target===$('archiveDrawer'))$('archiveDrawer').hidden=true};
  $('installBtn').onclick=install;$('closeInstall').onclick=()=>$('installModal').hidden=true;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e});
