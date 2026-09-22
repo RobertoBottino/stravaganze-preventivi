@@ -73,12 +73,12 @@ function wire(){
  $('laborPct').oninput=e=>{state.preventivo.manodoperaPct=S.num(e.target.value);changed();renderTotals()};
  $('plannerPct').oninput=e=>{state.preventivo.weddingPlannerPct=S.num(e.target.value);changed();renderTotals()};
  $('vatPct').oninput=e=>{state.preventivo.ivaPct=S.num(e.target.value);changed();renderTotals()};
- $('bonusDesc').oninput=e=>{state.preventivo.bonusDesc=e.target.value;changed()};$('bonusValue').oninput=e=>{state.preventivo.bonusValue=S.num(e.target.value);changed()};
+ $('addBonusBtn').onclick=()=>{state.preventivo.bonusItems=state.preventivo.bonusItems||[];state.preventivo.bonusItems.push({id:S.uuid(),descrizione:'',valore:0});changed();renderBonuses()};
  $('generateBtn').onclick=generate;$('sharePdfBtn').onclick=shareGeneratedPdf;$('downloadPdfBtn').onclick=downloadGeneratedPdf;$('backupBtn').onclick=backup;$('importBtn').onclick=()=>$('importFile').click();$('importFile').onchange=async e=>{const f=e.target.files?.[0];if(f)await importBackup(f);e.target.value=''};
  $('templateInput').onchange=async e=>{const f=e.target.files?.[0];if(f)await saveTemplate(f);e.target.value=''};$('storyRange').onchange=updateRanges;$('testRange').onchange=updateRanges;
 }
 function renderFields(){$('contractFields').innerHTML=defs.map(([k,l,t])=>`<label class="field"><span>${l}</span><input data-d="${k}" type="${t}"></label>`).join('');document.querySelectorAll('[data-d]').forEach(el=>el.oninput=e=>{state.dati[e.target.dataset.d]=e.target.value;changed();renderHeader()})}
-function renderAll(){state=S.migrateProject(state);document.querySelectorAll('[data-d]').forEach(el=>el.value=state.dati[el.dataset.d]??'');$('laborPct').value=state.preventivo.manodoperaPct??20;$('plannerPct').value=state.preventivo.weddingPlannerPct??0;$('vatPct').value=state.preventivo.ivaPct??22;$('bonusDesc').value=state.preventivo.bonusDesc||'';$('bonusValue').value=state.preventivo.bonusValue||'';renderHeader();renderProposals();renderPricing();renderTotals()}
+function renderAll(){state=S.migrateProject(state);document.querySelectorAll('[data-d]').forEach(el=>el.value=state.dati[el.dataset.d]??'');$('laborPct').value=state.preventivo.manodoperaPct??20;$('plannerPct').value=state.preventivo.weddingPlannerPct??0;$('vatPct').value=state.preventivo.ivaPct??22;renderHeader();renderProposals();renderPricing();renderBonuses();renderTotals()}
 function title(){return[state.dati.nomeSposa,state.dati.nomeSposo].filter(Boolean).join(' e ')||'Nuovo matrimonio'}
 function renderHeader(){const t=S.calc(state);$('projectTitle').textContent=title();$('projectSub').textContent=`${state.dati.dataEvento||'Data evento da inserire'} · ${S.euro(t.total)}`}
 function normalizeProposal(p){
@@ -99,6 +99,19 @@ function renderProposals(){
 function moveImage(p,id,d){const i=p.immagini.findIndex(x=>x.id===id),j=i+d;if(i<0||j<0||j>=p.immagini.length)return;[p.immagini[i],p.immagini[j]]=[p.immagini[j],p.immagini[i]];changed();renderProposals()}
 function movePage(id,d){const i=state.pagine.findIndex(x=>x.id===id),j=i+d;if(i<0||j<0||j>=state.pagine.length)return;[state.pagine[i],state.pagine[j]]=[state.pagine[j],state.pagine[i]];changed();renderProposals()}
 function renderPricing(){const body=$('pricingRows');body.innerHTML=state.preventivo.voci.map(v=>`<tr data-id="${v.id}"><td><input data-r="descrizione" value="${S.attr(v.descrizione)}" placeholder="es. Centrotavola"></td><td><input data-r="quantita" type="number" min="0" step="0.1" value="${v.quantita}"></td><td><input data-r="prezzoUnitario" type="number" min="0" step="0.01" value="${v.prezzoUnitario}"></td><td class="row-total">${S.euro(S.num(v.quantita)*S.num(v.prezzoUnitario))}</td><td><button class="danger" data-del>×</button></td></tr>`).join('');body.querySelectorAll('tr').forEach(tr=>{const v=state.preventivo.voci.find(x=>x.id===tr.dataset.id);tr.querySelectorAll('[data-r]').forEach(el=>el.oninput=e=>{const k=e.target.dataset.r;v[k]=k==='descrizione'?e.target.value:S.num(e.target.value);tr.querySelector('.row-total').textContent=S.euro(S.num(v.quantita)*S.num(v.prezzoUnitario));changed();renderTotals()});tr.querySelector('[data-del]').onclick=()=>{state.preventivo.voci=state.preventivo.voci.filter(x=>x.id!==v.id);changed();renderPricing();renderTotals()}})}
+function renderBonuses(){
+ state=S.migrateProject(state);
+ const host=$('bonusList');if(!host)return;
+ const items=state.preventivo.bonusItems||[];
+ if(!items.length){host.innerHTML='<div class="bonus-empty">Nessun bonus o omaggio inserito.</div>';return}
+ host.innerHTML=items.map((x,i)=>`<div class="bonus-row" data-bonus="${x.id}"><div class="bonus-index">${i+1}</div><label class="field bonus-description"><span>Descrizione bonus / omaggio</span><textarea rows="2" data-bonus-desc placeholder="es. Flower bar in omaggio">${S.esc(x.descrizione||'')}</textarea></label><label class="field bonus-value"><span>Valore indicativo €</span><input data-bonus-value type="number" min="0" step="0.01" value="${S.num(x.valore)||''}" placeholder="0,00"></label><button type="button" class="danger bonus-delete" data-bonus-del title="Rimuovi bonus" aria-label="Rimuovi bonus">×</button></div>`).join('');
+ host.querySelectorAll('[data-bonus]').forEach(row=>{
+  const x=items.find(v=>v.id===row.dataset.bonus);if(!x)return;
+  row.querySelector('[data-bonus-desc]').oninput=e=>{x.descrizione=e.target.value;changed()};
+  row.querySelector('[data-bonus-value]').oninput=e=>{x.valore=S.num(e.target.value);changed()};
+  row.querySelector('[data-bonus-del]').onclick=()=>{state.preventivo.bonusItems=items.filter(v=>v.id!==x.id);changed();renderBonuses()}
+ })
+}
 function renderTotals(){const t=S.calc(state);$('totals').innerHTML=[['Base',t.base],['Manodopera',t.lab],['Wedding planner',t.planner],['Imponibile',t.taxable],['IVA',t.vat],['Totale',t.total],['Caparra 30%',t.deposit],['Saldo 70%',t.balance]].map(([k,v])=>`<div class="total-cell ${k==='Totale'?'grand':''}"><small>${k}</small><b>${S.euro(v)}</b></div>`).join('');renderHeader()}
 function clearGeneratedPdf(){generatedPdfBytes=null;generatedPdfName='';const box=$('pdfReady');if(box)box.hidden=true}
 function changed(){clearGeneratedPdf();$('saveState').textContent='Salvataggio…';$('saveState').classList.add('saving');clearTimeout(saveTimer);saveTimer=setTimeout(save,450)}
