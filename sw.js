@@ -1,5 +1,5 @@
-const CACHE='sf-preventivi-v39';
-const CORE=['./','./index.html','./styles.css?v=15','./proposal-v14.css?v=15','./crop-v18.css?v=20','./responsive-v19.css?v=19','./image-preview-v24.css?v=24','./nav-v29.css?v=29','./ux-v34.css?v=35','./google-forms-v37.css?v=37','./theme-light-v38.css?v=38','./db.js?v=15','./legacy-import-normalize-v27.js?v=27','./crop-v18.js?v=20','./image-preview-v24.js?v=24','./pdf.js?v=9','./contract-v10.js?v=36','./pdf-v10.js?v=33','./project-embed-v15.js?v=15','./app.js?v=39','./ui-v23.js?v=23','./pdf-import-v25.js?v=32','./nav-v29.js?v=35','./google-forms-v37.js?v=37','./manifest.webmanifest?v=15','./icons/icon.svg'];
+const CACHE='sf-preventivi-v40';
+const CORE=['./','./index.html','./styles.css?v=15','./proposal-v14.css?v=15','./crop-v18.css?v=20','./responsive-v19.css?v=19','./image-preview-v24.css?v=24','./nav-v29.css?v=29','./ux-v34.css?v=35','./google-forms-v37.css?v=37','./theme-light-v38.css?v=38','./bonus-v40.css?v=40','./db.js?v=40','./legacy-import-normalize-v27.js?v=27','./crop-v18.js?v=20','./image-preview-v24.js?v=24','./pdf.js?v=9','./contract-v10.js?v=36','./pdf-v10.js?v=40','./project-embed-v15.js?v=15','./app.js?v=40','./ui-v23.js?v=23','./pdf-import-v25.js?v=32','./nav-v29.js?v=35','./google-forms-v37.js?v=37','./manifest.webmanifest?v=15','./icons/icon.svg'];
 
 self.addEventListener('install',e=>{
   e.waitUntil(
