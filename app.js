@@ -73,6 +73,12 @@ function wire(){
  $('laborPct').oninput=e=>{state.preventivo.manodoperaPct=S.num(e.target.value);changed();renderTotals()};
  $('plannerPct').oninput=e=>{state.preventivo.weddingPlannerPct=S.num(e.target.value);changed();renderTotals()};
  $('vatPct').oninput=e=>{state.preventivo.ivaPct=S.num(e.target.value);changed();renderTotals()};
+ $('roundTotalEnabled').onchange=e=>{
+  state.preventivo.totaleArrotondatoAttivo=e.target.checked;
+  if(e.target.checked&&S.num(state.preventivo.totaleArrotondato)<=0)state.preventivo.totaleArrotondato=S.calc({...state,preventivo:{...state.preventivo,totaleArrotondatoAttivo:false}}).rawTotal;
+  changed();renderTotals()
+ };
+ $('roundedTotalValue').oninput=e=>{state.preventivo.totaleArrotondato=S.num(e.target.value);changed();renderTotals()};
  $('addBonusBtn').onclick=()=>{state.preventivo.bonusItems=state.preventivo.bonusItems||[];state.preventivo.bonusItems.push({id:S.uuid(),descrizione:'',valore:0});changed();renderBonuses()};
  $('generateBtn').onclick=generate;$('sharePdfBtn').onclick=shareGeneratedPdf;$('downloadPdfBtn').onclick=downloadGeneratedPdf;$('backupBtn').onclick=backup;$('importBtn').onclick=()=>$('importFile').click();$('importFile').onchange=async e=>{const f=e.target.files?.[0];if(f)await importBackup(f);e.target.value=''};
  $('templateInput').onchange=async e=>{const f=e.target.files?.[0];if(f)await saveTemplate(f);e.target.value=''};$('storyRange').onchange=updateRanges;$('testRange').onchange=updateRanges;
@@ -112,7 +118,28 @@ function renderBonuses(){
   row.querySelector('[data-bonus-del]').onclick=()=>{state.preventivo.bonusItems=items.filter(v=>v.id!==x.id);changed();renderBonuses()}
  })
 }
-function renderTotals(){const t=S.calc(state);$('totals').innerHTML=[['Base',t.base],['Manodopera',t.lab],['Wedding planner',t.planner],['Imponibile',t.taxable],['IVA',t.vat],['Totale',t.total],['Caparra 30%',t.deposit],['Saldo 70%',t.balance]].map(([k,v])=>`<div class="total-cell ${k==='Totale'?'grand':''}"><small>${k}</small><b>${S.euro(v)}</b></div>`).join('');renderHeader()}
+function renderTotals(){
+ const t=S.calc(state),p=state.preventivo;
+ const enabled=Boolean(p.totaleArrotondatoAttivo);
+ $('roundTotalEnabled').checked=enabled;
+ $('roundTotalFields').hidden=!enabled;
+ $('rawTotalPreview').value=S.euro(t.rawTotal);
+ if(document.activeElement!==$('roundedTotalValue'))$('roundedTotalValue').value=enabled?(S.num(p.totaleArrotondato)||''):'';
+ const cells=[['Base',t.base,''],['Manodopera',t.lab,''],['Wedding planner',t.planner,''],['Imponibile',t.taxable,''],['IVA',t.vat,'']];
+ if(t.hasOverride){
+  cells.push(['Totale calcolato',t.rawTotal,'grand old-grand']);
+  cells.push(['Totale concordato',t.total,'grand final-grand']);
+ }else cells.push(['Totale',t.rawTotal,'grand']);
+ cells.push(['Caparra 30%',t.deposit,''],['Saldo 70%',t.balance,'']);
+ $('totals').innerHTML=cells.map(([k,v,cls])=>`<div class="total-cell ${cls}"><small>${k}</small><b>${S.euro(v)}</b></div>`).join('');
+ if(enabled){
+  const rounded=S.num(p.totaleArrotondato);
+  $('roundTotalPreview').innerHTML=rounded>0
+   ?`Nel PDF: <span class="old-total">${S.euro(t.rawTotal)}</span><span class="new-total">${S.euro(rounded)}</span> · Caparra 30% ${S.euro(S.round(rounded*.30))} · Saldo 70% ${S.euro(S.round(rounded*.70))}`
+   :'Inserisci il totale finale concordato.';
+ }
+ renderHeader()
+}
 function clearGeneratedPdf(){generatedPdfBytes=null;generatedPdfName='';const box=$('pdfReady');if(box)box.hidden=true}
 function changed(){clearGeneratedPdf();$('saveState').textContent='Salvataggio…';$('saveState').classList.add('saving');clearTimeout(saveTimer);saveTimer=setTimeout(save,450)}
 async function save(){state.updatedAt=new Date().toISOString();await S.put(S.PROJECTS,state);localStorage.setItem('sf-last',state.id);$('saveState').textContent='Salvato';$('saveState').classList.remove('saving')}
