@@ -1,0 +1,64 @@
+/* Manual rounded total — v42 */
+.round-total-box{
+  margin-top:14px;
+  padding:14px;
+  border:1px solid var(--sf-line,#d8e1d2);
+  border-radius:14px;
+  background:#f8fbf6;
+}
+.round-total-toggle{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  cursor:pointer;
+}
+.round-total-toggle input{
+  width:20px;
+  height:20px;
+  margin-top:2px;
+  accent-color:var(--sf-green,#536345);
+  flex:0 0 auto;
+}
+.round-total-toggle b{
+  display:block;
+  color:var(--sf-green,#536345);
+  font-size:14px;
+}
+.round-total-toggle small{
+  display:block;
+  margin-top:4px;
+  color:var(--sf-muted,#6e776a);
+  line-height:1.45;
+}
+.round-total-fields{
+  margin-top:14px;
+  padding-top:14px;
+  border-top:1px solid #e0e8db;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  align-items:end;
+}
+.round-total-fields[hidden]{display:none!important}
+.round-total-preview{
+  grid-column:1/-1;
+  padding:10px 12px;
+  border-radius:11px;
+  background:#eef4e9;
+  color:#4f5d49;
+  font-size:13px;
+  line-height:1.45;
+}
+.round-total-preview .old-total{
+  text-decoration:line-through;
+  color:#8a9285;
+  margin-right:8px;
+}
+.round-total-preview .new-total{
+  color:var(--sf-green,#536345);
+  font-weight:800;
+}
+@media(max-width:700px){
+  .round-total-fields{grid-template-columns:1fr}
+  .round-total-preview{grid-column:auto}
+}
