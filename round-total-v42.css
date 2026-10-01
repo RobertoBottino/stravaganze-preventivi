@@ -62,3 +62,17 @@
   .round-total-fields{grid-template-columns:1fr}
   .round-total-preview{grid-column:auto}
 }
+
+.totals-card .old-grand b{
+  text-decoration:line-through;
+  color:#8c9587!important;
+  font-weight:600!important;
+}
+.totals-card .old-grand small{color:#8c9587!important}
+.totals-card .final-grand{
+  background:#eaf2e5;
+  border-radius:10px;
+  padding:9px 10px;
+}
+.totals-card .final-grand small,
+.totals-card .final-grand b{color:var(--sf-green,#536345)!important}
