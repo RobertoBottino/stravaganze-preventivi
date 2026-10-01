@@ -169,7 +169,21 @@ async function pricing(o,p,t,f,b){
  y-=12;g.drawLine({start:{x:55,y},end:{x:W-55,y},thickness:1,color:rgb(.82,.82,.78)});y-=26;
  const summary=[['Subtotale',t.taxable]];if(S.num(p.preventivo.ivaPct)>0)summary.push(['IVA',t.vat]);
  for(const z of summary){g.drawText(z[0],{x:55,y,size:11.5,font:f,color:dark});g.drawText(S.euro(z[1]),{x:400,y,size:11.5,font:b,color:dark});y-=21}
- g.drawText('TOTALE',{x:55,y:y-4,size:16,font:b,color:dark});g.drawText(S.euro(t.total),{x:380,y:y-4,size:16,font:b,color:dark});y-=44;
+ if(t.hasOverride){
+  const oldLabel='TOTALE CALCOLATO',oldValue=S.euro(t.rawTotal),oldY=y-2,oldSize=13,oldColor=rgb(.45,.48,.42);
+  g.drawText(oldLabel,{x:55,y:oldY,size:oldSize,font:f,color:oldColor});
+  g.drawText(oldValue,{x:390,y:oldY,size:oldSize,font:f,color:oldColor});
+  g.drawLine({start:{x:53,y:oldY+5.5},end:{x:55+f.widthOfTextAtSize(oldLabel,oldSize)+2,y:oldY+5.5},thickness:1.1,color:oldColor});
+  g.drawLine({start:{x:388,y:oldY+5.5},end:{x:390+f.widthOfTextAtSize(oldValue,oldSize)+2,y:oldY+5.5},thickness:1.1,color:oldColor});
+  y-=28;
+  g.drawText('TOTALE CONCORDATO',{x:55,y:y-4,size:16,font:b,color:dark});
+  g.drawText(S.euro(t.total),{x:365,y:y-4,size:16,font:b,color:dark});
+  y-=44;
+ }else{
+  g.drawText('TOTALE',{x:55,y:y-4,size:16,font:b,color:dark});
+  g.drawText(S.euro(t.total),{x:380,y:y-4,size:16,font:b,color:dark});
+  y-=44;
+ }
  g.drawText('Caparra 30%: '+S.euro(t.deposit)+' · Saldo 70%: '+S.euro(t.balance),{x:55,y,size:11.5,font:f,color:dark});
 
  const bonusItems=(p.preventivo.bonusItems||[]).filter(x=>String(x.descrizione||'').trim()||S.num(x.valore)>0);
