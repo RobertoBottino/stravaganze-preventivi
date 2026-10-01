@@ -37,25 +37,79 @@ function noteLayout(f,text){
 }
 function splitChunks(images,firstCap){if(!images.length)return[[]];const out=[],rest=images.slice();if(firstCap===0)out.push([]);else out.push(rest.splice(0,firstCap));while(rest.length)out.push(rest.splice(0,MAX_IMAGES_PER_PAGE));return out}
 function drawCenteredBlock(p,lines,start,size,font,color,lineH,minY=62){let y=start,i=0;for(;i<lines.length;i++){if(y<minY)break;const ln=lines[i];if(ln){const tw=font.widthOfTextAtSize(ln,size);p.drawText(ln,{x:(W-tw)/2,y,size,font,color})}y-=lineH}return{used:i,y}}
+function captionLayout(f,im,maxW){
+ const caption=String(im?.descrizione||'').trim();
+ if(!caption)return{caption:'',size:11.2,lines:[],lineH:15,height:0};
+ const fit=fittedLines(f,caption,11.2,9.8,maxW,7),lineH=fit.size*1.34;
+ return{caption,size:fit.size,lines:fit.lines,lineH,height:17+fit.lines.length*lineH};
+}
 async function drawProposalImage(o,p,im,x,rowTop,maxW,maxH,f){
  let imageBottom=rowTop;
  try{
   const j=await o.embedJpg(data(im.dataUrl)),sc=Math.min(maxW/j.width,maxH/j.height),ww=j.width*sc,hh=j.height*sc,imgX=x+(maxW-ww)/2,imgY=rowTop-hh;
   p.drawImage(j,{x:imgX,y:imgY,width:ww,height:hh});imageBottom=imgY
  }catch(e){console.warn('Immagine proposta non leggibile',e);imageBottom=rowTop-maxH}
- const caption=String(im.descrizione||'').trim();
+ const cap=captionLayout(f,im,maxW);
  let bottom=imageBottom;
- if(caption){
-  const fit=fittedLines(f,caption,11.2,9.8,maxW,7),cx=x+maxW/2,lineH=fit.size*1.34;
-  let cy=imageBottom-17;
-  for(const ln of fit.lines){
-   const tw=f.widthOfTextAtSize(ln,fit.size);
-   p.drawText(ln,{x:cx-tw/2,y:cy,size:fit.size,font:f,color:dark});
-   cy-=lineH
+ if(cap.caption){
+  const cx=x+maxW/2;let cy=imageBottom-17;
+  for(const ln of cap.lines){
+   const tw=f.widthOfTextAtSize(ln,cap.size);
+   p.drawText(ln,{x:cx-tw/2,y:cy,size:cap.size,font:f,color:dark});
+   cy-=cap.lineH
   }
   bottom=cy+4
  }
  return bottom
+}
+function proposalBottomReserve(noteLines,lineH){
+ return noteLines?Math.min(205,78+Math.min(noteLines,8)*lineH):58
+}
+function imageRowsForCount(n){
+ if(n<=0)return[];
+ if(n===1)return[[0]];
+ if(n===2)return[[0],[1]];
+ if(n===3)return[[0,1],[2]];
+ const rows=[];for(let i=0;i<n;i+=2)rows.push([i,...(i+1<n?[i+1]:[])]);
+ return rows
+}
+function targetImageBox(chunkLength,rowIndex,rowCount,availableW,availableH,captionH){
+ const twoColW=(availableW-20)/2;
+ if(chunkLength===1)return{w:Math.min(515,availableW),h:Math.min(455,Math.max(235,availableH-captionH-8))};
+ if(chunkLength===2){
+  const each=Math.max(135,(availableH-captionH-34)/2);
+  return{w:Math.min(485,availableW),h:Math.min(285,each)}
+ }
+ if(chunkLength===3&&rowIndex===0)return{w:Math.min(255,twoColW),h:Math.min(205,Math.max(145,availableH*.34-captionH))};
+ if(chunkLength===3&&rowIndex===1)return{w:Math.min(420,availableW),h:Math.min(265,Math.max(175,availableH*.46-captionH))};
+ if(chunkLength===4)return{w:twoColW,h:Math.min(205,Math.max(145,(availableH-captionH-30)/2))};
+ return{w:twoColW,h:Math.min(175,Math.max(118,(availableH-captionH-(rowCount-1)*24)/Math.max(1,rowCount)))}
+}
+async function drawAdaptiveProposalImages(o,p,chunk,currentY,bottomY,f){
+ if(!chunk.length)return currentY;
+ const margin=40,availableW=W-margin*2,rows=imageRowsForCount(chunk.length);
+ const totalAvailable=Math.max(180,currentY-bottomY);
+ let cursor=currentY;
+ for(let rowIndex=0;rowIndex<rows.length;rowIndex++){
+  const ids=rows[rowIndex],rowItems=ids.map(i=>chunk[i]),single=ids.length===1;
+  const remainingRows=rows.length-rowIndex;
+  const remainingHeight=Math.max(150,cursor-bottomY);
+  const rowShare=remainingHeight/remainingRows;
+  const probeW=single?(chunk.length===1?Math.min(515,availableW):chunk.length===3?Math.min(420,availableW):Math.min(395,availableW)):(availableW-20)/2;
+  const captionH=Math.max(0,...rowItems.map(im=>captionLayout(f,im,probeW).height));
+  const box=targetImageBox(chunk.length,rowIndex,rows.length,availableW,totalAvailable,captionH);
+  const boxW=single?box.w:Math.min(box.w,(availableW-20)/2);
+  const boxH=Math.min(box.h,Math.max(105,rowShare-captionH-12));
+  let rowBottom=Infinity;
+  for(let col=0;col<rowItems.length;col++){
+   const x=single?(W-boxW)/2:margin+col*(boxW+20);
+   const bottom=await drawProposalImage(o,p,rowItems[col],x,cursor,boxW,boxH,f);
+   rowBottom=Math.min(rowBottom,bottom)
+  }
+  const rowGap=chunk.length<=2?30:rowIndex===rows.length-1?22:26;
+  cursor=rowBottom-rowGap
+ }
+ return cursor
 }
 async function proposal(o,m,f,b){
  const images=Array.isArray(m.immagini)?m.immagini:[];
@@ -67,29 +121,21 @@ async function proposal(o,m,f,b){
   const p=page(o),chunk=chunks[pageIndex],introPage=pageIndex===0&&intro,isLastChunk=pageIndex===chunks.length-1;
   center(p,(m.sezione||'LA NOSTRA PROPOSTA PER VOI').toUpperCase(),H-35,13,b);if(m.titolo)center(p,m.titolo.toUpperCase(),750,15,b);
   let currentY=710;
-  if(introPage){currentY=718;for(const ln of il.lines){if(ln){const tw=f.widthOfTextAtSize(ln,il.size);p.drawText(ln,{x:(W-tw)/2,y:currentY,size:il.size,font:f,color:dark})}currentY-=il.lineH}currentY-=24}
-  if(chunk.length===1){
-    const bottomReserve=isLastChunk&&note?Math.min(205,85+Math.min(nl.lines.length,8)*nl.lineH):82;
-    const maxH=Math.min(315,Math.max(150,currentY-bottomReserve-34)),maxW=Math.min(W-105,455);
-    currentY=await drawProposalImage(o,p,chunk[0],(W-maxW)/2,currentY,maxW,maxH,f)-30;
-  }else if(chunk.length===2){
-    const bottomReserve=isLastChunk&&note?Math.min(185,80+Math.min(nl.lines.length,7)*nl.lineH):78;
-    const available=Math.max(270,currentY-bottomReserve),gap=34,captionReserve=118;
-    const maxH=Math.min(215,Math.max(105,(available-gap-captionReserve)/2)),maxW=Math.min(W-125,420);
-    currentY=await drawProposalImage(o,p,chunk[0],(W-maxW)/2,currentY,maxW,maxH,f)-gap;
-    currentY=await drawProposalImage(o,p,chunk[1],(W-maxW)/2,currentY,maxW,maxH,f)-28;
-  }else if(chunk.length){
-    const margin=55,gap=18,cellW=(W-margin*2-gap)/2,rows=Math.ceil(chunk.length/2);
-    for(let row=0;row<rows;row++){
-      const rowItems=chunk.slice(row*2,row*2+2),single=rowItems.length===1,boxW=single?Math.min(W-155,365):cellW;
-      let boxH=single?195:145;const remainingRows=rows-row,minNeededBelow=(remainingRows-1)*190+70,maxAllowed=Math.max(120,currentY-minNeededBelow-70);boxH=Math.min(boxH,maxAllowed);
-      let rowBottom=Infinity;
-      for(let col=0;col<rowItems.length;col++){const x=single?(W-boxW)/2:margin+col*(cellW+gap),bottom=await drawProposalImage(o,p,rowItems[col],x,currentY,boxW,boxH,f);rowBottom=Math.min(rowBottom,bottom)}
-      currentY=rowBottom-28
-    }
+  if(introPage){
+   currentY=718;
+   for(const ln of il.lines){
+    if(ln){const tw=f.widthOfTextAtSize(ln,il.size);p.drawText(ln,{x:(W-tw)/2,y:currentY,size:il.size,font:f,color:dark})}
+    currentY-=il.lineH
+   }
+   currentY-=22
   }
+
+  const noteReserve=isLastChunk?proposalBottomReserve(nl.lines.length,nl.lineH):58;
+  const bottomY=Math.max(68,noteReserve);
+  if(chunk.length)currentY=await drawAdaptiveProposalImages(o,p,chunk,currentY,bottomY,f);
+
   if(isLastChunk&&notePos<nl.lines.length){
-   const startY=Math.min(currentY-8,images.length?currentY-8:Math.max(690,currentY));
+   const startY=Math.min(currentY-5,images.length?currentY-5:Math.max(690,currentY));
    const r=drawCenteredBlock(p,nl.lines.slice(notePos),startY,nl.size,f,dark,nl.lineH,62);
    notePos+=r.used
   }
