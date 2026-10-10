@@ -143,7 +143,7 @@ function movePricingKeyboard(id,dir){
  if(i<0||j<0||j>=state.preventivo.voci.length)return;
  [state.preventivo.voci[i],state.preventivo.voci[j]]=[state.preventivo.voci[j],state.preventivo.voci[i]];
  changed();renderPricing();renderTotals();
- setTimeout(()=>$('pricingRows')?.querySelector(\`tr[data-id="\${id}"] [data-drag]\`)?.focus(),0)
+ setTimeout(()=>$('pricingRows')?.querySelector(`tr[data-id="${id}"] [data-drag]`)?.focus(),0)
 }
 function enablePricingDrag(body){
  body.querySelectorAll('[data-drag]').forEach(handle=>{
@@ -185,7 +185,7 @@ function proposalPricingLine(v){
  const q=S.num(v.quantita),unit=S.round(S.num(v.prezzoUnitario)*k),line=S.round(q*unit);
  const qty=q.toLocaleString('it-IT',{maximumFractionDigits:2});
  const desc=String(v.descrizione||'Voce').trim()||'Voce';
- return q===1?\`\${desc} · \${S.euro(unit)}\`:\`\${desc} · \${qty} × \${S.euro(unit)} = \${S.euro(line)}\`
+ return q===1?`${desc} · ${S.euro(unit)}`:`${desc} · ${qty} × ${S.euro(unit)} = ${S.euro(line)}`
 }
 function openPricingCopyModal(pageId){
  pricingCopyTargetId=pageId;
@@ -195,7 +195,7 @@ function openPricingCopyModal(pageId){
  $('pricingCopyList').innerHTML=rows.length?rows.map(v=>{
   const q=S.num(v.quantita),labor=S.num(state.preventivo.manodoperaPct),planner=S.num(state.preventivo.weddingPlannerPct),k=1+(labor+planner)/100;
   const unit=S.round(S.num(v.prezzoUnitario)*k),line=S.round(q*unit);
-  return \`<label class="pricing-copy-item"><input type="checkbox" value="\${S.attr(v.id)}"><span class="pricing-copy-item-main"><b>\${S.esc(v.descrizione||'Voce senza descrizione')}</b><small>Q.tà \${q.toLocaleString('it-IT',{maximumFractionDigits:2})} · \${S.euro(unit)} cad.</small></span><span class="pricing-copy-item-price">\${S.euro(line)}</span></label>\`
+  return `<label class="pricing-copy-item"><input type="checkbox" value="${S.attr(v.id)}"><span class="pricing-copy-item-main"><b>${S.esc(v.descrizione||'Voce senza descrizione')}</b><small>Q.tà ${q.toLocaleString('it-IT',{maximumFractionDigits:2})} · ${S.euro(unit)} cad.</small></span><span class="pricing-copy-item-price">${S.euro(line)}</span></label>`
  }).join(''):'<div class="pricing-copy-empty">Non ci sono ancora voci nel preventivo.</div>';
  const append=document.querySelector('input[name="pricingCopyMode"][value="append"]');if(append)append.checked=true;
  $('copyPricingModal').hidden=false;
