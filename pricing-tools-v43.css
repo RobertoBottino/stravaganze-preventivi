@@ -1,0 +1,175 @@
+/* Pricing reorder + copy-to-proposal — v43 */
+.pricing-desc-cell{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.pricing-desc-cell input{flex:1 1 auto}
+.price-drag{
+  flex:0 0 36px;
+  width:36px;
+  min-width:36px;
+  height:40px;
+  min-height:40px;
+  padding:0;
+  border-radius:10px;
+  background:#f2f6ef!important;
+  border:1px solid #d7e1d1!important;
+  color:var(--sf-green,#536345)!important;
+  font-size:18px;
+  line-height:1;
+  cursor:grab;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.price-drag:active{cursor:grabbing}
+.pricing-table tr.is-dragging{
+  opacity:.62;
+  transform:scale(.995);
+  box-shadow:0 8px 24px rgba(67,82,59,.12);
+}
+.price-reordering{user-select:none;-webkit-user-select:none}
+.price-reordering *{cursor:grabbing!important}
+.price-copy-field{position:relative}
+.price-copy-field .price-copy-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:6px;
+}
+.price-copy-field .price-copy-head>span{
+  color:#56624f;
+  font-size:12px;
+  letter-spacing:.015em;
+}
+.price-copy-field .copy-pricing-btn{
+  min-height:36px;
+  padding:7px 10px;
+  font-size:11px;
+  white-space:nowrap;
+}
+.pricing-copy-dialog{width:min(720px,100%)!important}
+.pricing-copy-dialog h3{margin:2px 42px 5px 0}
+.pricing-copy-target{
+  margin:0 0 8px;
+  color:var(--sf-green,#536345);
+  font-weight:800;
+}
+.pricing-copy-help{
+  margin:0 0 14px;
+  color:var(--sf-muted,#6e776a);
+  line-height:1.48;
+  font-size:13px;
+}
+.pricing-copy-toolbar{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}
+.pricing-copy-toolbar .btn{min-height:38px;padding:7px 10px;font-size:12px}
+.pricing-copy-list{
+  display:grid;
+  gap:8px;
+  max-height:min(44vh,420px);
+  overflow:auto;
+  padding:2px;
+  overscroll-behavior:contain;
+}
+.pricing-copy-empty{
+  padding:18px;
+  text-align:center;
+  border:1px dashed #cdd8c7;
+  border-radius:12px;
+  color:var(--sf-muted,#6e776a);
+  background:#fafcf8;
+}
+.pricing-copy-item{
+  display:grid;
+  grid-template-columns:22px minmax(0,1fr) auto;
+  gap:10px;
+  align-items:center;
+  padding:11px 12px;
+  border:1px solid #dce5d7;
+  border-radius:12px;
+  background:#fff;
+  cursor:pointer;
+}
+.pricing-copy-item:hover{background:#f8fbf6;border-color:#c9d8c1}
+.pricing-copy-item input{
+  width:18px;
+  height:18px;
+  accent-color:var(--sf-green,#536345);
+}
+.pricing-copy-item-main{min-width:0}
+.pricing-copy-item-main b{
+  display:block;
+  color:#3d4938;
+  font-size:13px;
+  overflow-wrap:anywhere;
+}
+.pricing-copy-item-main small{
+  display:block;
+  margin-top:3px;
+  color:#7a8474;
+  line-height:1.35;
+}
+.pricing-copy-item-price{
+  color:var(--sf-green,#536345);
+  font-weight:800;
+  font-size:13px;
+  white-space:nowrap;
+}
+.pricing-copy-mode{
+  margin-top:12px;
+  padding:11px 12px;
+  border-radius:12px;
+  background:#f1f6ed;
+  display:flex;
+  gap:14px;
+  flex-wrap:wrap;
+}
+.pricing-copy-mode label{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  font-size:12px;
+  color:#4d5848;
+  cursor:pointer;
+}
+.pricing-copy-mode input{accent-color:var(--sf-green,#536345)}
+.pricing-copy-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:9px;
+  margin-top:14px;
+}
+@media(max-width:600px){
+  .pricing-table td.pricing-desc-cell{
+    grid-template-columns:104px 40px minmax(0,1fr);
+  }
+  .pricing-table td.pricing-desc-cell::before{grid-column:1}
+  .pricing-desc-cell .price-drag{grid-column:2}
+  .pricing-desc-cell input{grid-column:3}
+  .price-copy-field .price-copy-head{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  .price-copy-field .copy-pricing-btn{width:100%;min-height:44px}
+  .pricing-copy-dialog{
+    width:100%!important;
+    max-height:calc(100dvh - 20px)!important;
+  }
+  .pricing-copy-item{
+    grid-template-columns:22px minmax(0,1fr);
+  }
+  .pricing-copy-item-price{
+    grid-column:2;
+    white-space:normal;
+  }
+  .pricing-copy-mode{display:grid;gap:9px}
+  .pricing-copy-actions{display:grid;grid-template-columns:1fr}
+  .pricing-copy-actions .btn{width:100%;min-height:46px}
+}
