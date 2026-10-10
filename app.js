@@ -1,6 +1,6 @@
 window.SF=window.SF||{};
 (()=>{'use strict';
-const S=window.SF,$=id=>document.getElementById(id);let state=S.newProject(),installPrompt=null,saveTimer=null,generatedPdfBytes=null,generatedPdfName='';
+const S=window.SF,$=id=>document.getElementById(id);let state=S.newProject(),installPrompt=null,saveTimer=null,generatedPdfBytes=null,generatedPdfName='',pricingCopyTargetId=null;
 const defs=[
  ['nomeSposa','Nome sposa','text'],
  ['nomeSposo','Nome sposo','text'],
@@ -82,6 +82,12 @@ function wire(){
  $('addBonusBtn').onclick=()=>{state.preventivo.bonusItems=state.preventivo.bonusItems||[];state.preventivo.bonusItems.push({id:S.uuid(),descrizione:'',valore:0});changed();renderBonuses()};
  $('generateBtn').onclick=generate;$('sharePdfBtn').onclick=shareGeneratedPdf;$('downloadPdfBtn').onclick=downloadGeneratedPdf;$('backupBtn').onclick=backup;$('importBtn').onclick=()=>$('importFile').click();$('importFile').onchange=async e=>{const f=e.target.files?.[0];if(f)await importBackup(f);e.target.value=''};
  $('templateInput').onchange=async e=>{const f=e.target.files?.[0];if(f)await saveTemplate(f);e.target.value=''};$('storyRange').onchange=updateRanges;$('testRange').onchange=updateRanges;
+ $('closeCopyPricing').onclick=closePricingCopyModal;
+ $('cancelCopyPricing').onclick=closePricingCopyModal;
+ $('copyPricingModal').onclick=e=>{if(e.target===$('copyPricingModal'))closePricingCopyModal()};
+ $('selectAllPricingCopy').onclick=()=>document.querySelectorAll('#pricingCopyList input[type="checkbox"]').forEach(x=>x.checked=true);
+ $('clearPricingCopy').onclick=()=>document.querySelectorAll('#pricingCopyList input[type="checkbox"]').forEach(x=>x.checked=false);
+ $('confirmCopyPricing').onclick=insertSelectedPricingIntoProposal;
 }
 function renderFields(){$('contractFields').innerHTML=defs.map(([k,l,t])=>`<label class="field"><span>${l}</span><input data-d="${k}" type="${t}"></label>`).join('');document.querySelectorAll('[data-d]').forEach(el=>el.oninput=e=>{state.dati[e.target.dataset.d]=e.target.value;changed();renderHeader()})}
 function renderAll(){state=S.migrateProject(state);document.querySelectorAll('[data-d]').forEach(el=>el.value=state.dati[el.dataset.d]??'');$('laborPct').value=state.preventivo.manodoperaPct??20;$('plannerPct').value=state.preventivo.weddingPlannerPct??0;$('vatPct').value=state.preventivo.ivaPct??22;renderHeader();renderProposals();renderPricing();renderBonuses();renderTotals()}
@@ -99,12 +105,117 @@ function normalizeProposal(p){
 function imageCard(im,i,total){return `<div class="proposal-image-card" data-im="${im.id}"><div class="proposal-image-preview"><img src="${im.dataUrl}" alt="Immagine proposta"><div class="proposal-image-actions"><button type="button" data-imove="-1" ${i===0?'disabled':''} title="Sposta indietro">←</button><button type="button" data-imove="1" ${i===total-1?'disabled':''} title="Sposta avanti">→</button><button type="button" data-rm="${im.id}" class="danger" title="Rimuovi">×</button></div></div><label class="field proposal-caption"><span>Descrizione immagine</span><textarea data-imdesc placeholder="Descrizione breve che comparirà sotto questa immagine">${S.esc(im.descrizione||'')}</textarea></label></div>`}
 function renderProposals(){
  const root=$('proposalList');if(!state.pagine.length){root.innerHTML='<div class="empty">Nessuna pagina. Aggiungi la prima pagina della proposta.</div>';return}
- root.innerHTML=state.pagine.map((raw,i)=>{const p=normalizeProposal(raw);return `<article class="proposal-card" data-id="${p.id}"><div class="proposal-head"><b>Pagina ${i+1}</b><div class="mini-actions"><button data-a="up" ${i===0?'disabled':''}>↑</button><button data-a="down" ${i===state.pagine.length-1?'disabled':''}>↓</button><button data-a="del" class="danger">×</button></div></div><div class="grid two"><label class="field"><span>Intestazione</span><input data-p="sezione" value="${S.attr(p.sezione)}"></label><label class="field"><span>Titolo</span><input data-p="titolo" value="${S.attr(p.titolo)}"></label><label class="field" style="grid-column:1/-1"><span>Testo introduttivo della pagina</span><textarea data-p="testoIntro" rows="5" placeholder="Testo lungo centrato che comparirà prima delle immagini">${S.esc(p.testoIntro||'')}</textarea><small>Usa questo spazio per la spiegazione completa. Le descrizioni sotto le immagini possono restare più concise.</small></label><label class="field" style="grid-column:1/-1"><span>Prezzo / nota pagina</span><textarea data-p="prezzoTesto">${S.esc(p.prezzoTesto||'')}</textarea></label></div><div class="proposal-images-head"><div><b>Immagini e descrizioni</b><small>Massimo 2 immagini per riga nel PDF. Se sono dispari, l’ultima viene centrata.</small></div><label class="btn secondary proposal-upload">+ Aggiungi foto<input data-upload type="file" accept="image/*" multiple hidden></label></div><div class="proposal-image-grid">${p.immagini.map((im,j)=>imageCard(im,j,p.immagini.length)).join('')}</div></article>`}).join('');
- root.querySelectorAll('.proposal-card').forEach(card=>{const id=card.dataset.id,p=normalizeProposal(state.pagine.find(x=>x.id===id));card.querySelectorAll('[data-p]').forEach(el=>el.oninput=e=>{p[e.target.dataset.p]=e.target.value;changed()});card.querySelector('[data-a="up"]')?.addEventListener('click',()=>movePage(id,-1));card.querySelector('[data-a="down"]')?.addEventListener('click',()=>movePage(id,1));card.querySelector('[data-a="del"]')?.addEventListener('click',()=>{if(confirm('Rimuovere questa pagina?')){state.pagine=state.pagine.filter(x=>x.id!==id);changed();renderProposals()}});card.querySelectorAll('[data-im]').forEach(imCard=>{const im=p.immagini.find(x=>x.id===imCard.dataset.im);imCard.querySelector('[data-imdesc]').oninput=e=>{im.descrizione=e.target.value;changed()};imCard.querySelector('[data-rm]').onclick=()=>{p.immagini=p.immagini.filter(x=>x.id!==im.id);changed();renderProposals()};imCard.querySelectorAll('[data-imove]').forEach(btn=>btn.onclick=()=>moveImage(p,im.id,Number(btn.dataset.imove)))});const up=card.querySelector('[data-upload]');if(up)up.onchange=async e=>{const files=[...e.target.files];for(const f of files)p.immagini.push({id:S.uuid(),dataUrl:await S.imageToJpeg(f),descrizione:''});e.target.value='';changed();renderProposals()}})
+ root.innerHTML=state.pagine.map((raw,i)=>{const p=normalizeProposal(raw);return `<article class="proposal-card" data-id="${p.id}"><div class="proposal-head"><b>Pagina ${i+1}</b><div class="mini-actions"><button data-a="up" ${i===0?'disabled':''}>↑</button><button data-a="down" ${i===state.pagine.length-1?'disabled':''}>↓</button><button data-a="del" class="danger">×</button></div></div><div class="grid two"><label class="field"><span>Intestazione</span><input data-p="sezione" value="${S.attr(p.sezione)}"></label><label class="field"><span>Titolo</span><input data-p="titolo" value="${S.attr(p.titolo)}"></label><label class="field" style="grid-column:1/-1"><span>Testo introduttivo della pagina</span><textarea data-p="testoIntro" rows="5" placeholder="Testo lungo centrato che comparirà prima delle immagini">${S.esc(p.testoIntro||'')}</textarea><small>Usa questo spazio per la spiegazione completa. Le descrizioni sotto le immagini possono restare più concise.</small></label><label class="field price-copy-field" style="grid-column:1/-1"><span class="price-copy-head"><span>Prezzo / nota pagina</span><button type="button" class="btn secondary copy-pricing-btn" data-copy-pricing>+ Copia voci dal preventivo</button></span><textarea data-p="prezzoTesto">${S.esc(p.prezzoTesto||'')}</textarea></label></div><div class="proposal-images-head"><div><b>Immagini e descrizioni</b><small>Massimo 2 immagini per riga nel PDF. Se sono dispari, l’ultima viene centrata.</small></div><label class="btn secondary proposal-upload">+ Aggiungi foto<input data-upload type="file" accept="image/*" multiple hidden></label></div><div class="proposal-image-grid">${p.immagini.map((im,j)=>imageCard(im,j,p.immagini.length)).join('')}</div></article>`}).join('');
+ root.querySelectorAll('.proposal-card').forEach(card=>{const id=card.dataset.id,p=normalizeProposal(state.pagine.find(x=>x.id===id));card.querySelectorAll('[data-p]').forEach(el=>el.oninput=e=>{p[e.target.dataset.p]=e.target.value;changed()});card.querySelector('[data-copy-pricing]')?.addEventListener('click',()=>openPricingCopyModal(id));card.querySelector('[data-a="up"]')?.addEventListener('click',()=>movePage(id,-1));card.querySelector('[data-a="down"]')?.addEventListener('click',()=>movePage(id,1));card.querySelector('[data-a="del"]')?.addEventListener('click',()=>{if(confirm('Rimuovere questa pagina?')){state.pagine=state.pagine.filter(x=>x.id!==id);changed();renderProposals()}});card.querySelectorAll('[data-im]').forEach(imCard=>{const im=p.immagini.find(x=>x.id===imCard.dataset.im);imCard.querySelector('[data-imdesc]').oninput=e=>{im.descrizione=e.target.value;changed()};imCard.querySelector('[data-rm]').onclick=()=>{p.immagini=p.immagini.filter(x=>x.id!==im.id);changed();renderProposals()};imCard.querySelectorAll('[data-imove]').forEach(btn=>btn.onclick=()=>moveImage(p,im.id,Number(btn.dataset.imove)))});const up=card.querySelector('[data-upload]');if(up)up.onchange=async e=>{const files=[...e.target.files];for(const f of files)p.immagini.push({id:S.uuid(),dataUrl:await S.imageToJpeg(f),descrizione:''});e.target.value='';changed();renderProposals()}})
 }
 function moveImage(p,id,d){const i=p.immagini.findIndex(x=>x.id===id),j=i+d;if(i<0||j<0||j>=p.immagini.length)return;[p.immagini[i],p.immagini[j]]=[p.immagini[j],p.immagini[i]];changed();renderProposals()}
 function movePage(id,d){const i=state.pagine.findIndex(x=>x.id===id),j=i+d;if(i<0||j<0||j>=state.pagine.length)return;[state.pagine[i],state.pagine[j]]=[state.pagine[j],state.pagine[i]];changed();renderProposals()}
-function renderPricing(){const body=$('pricingRows');body.innerHTML=state.preventivo.voci.map(v=>`<tr data-id="${v.id}"><td><input data-r="descrizione" value="${S.attr(v.descrizione)}" placeholder="es. Centrotavola"></td><td><input data-r="quantita" type="number" min="0" step="0.1" value="${v.quantita}"></td><td><input data-r="prezzoUnitario" type="number" min="0" step="0.01" value="${v.prezzoUnitario}"></td><td class="row-total">${S.euro(S.num(v.quantita)*S.num(v.prezzoUnitario))}</td><td><button class="danger" data-del>×</button></td></tr>`).join('');body.querySelectorAll('tr').forEach(tr=>{const v=state.preventivo.voci.find(x=>x.id===tr.dataset.id);tr.querySelectorAll('[data-r]').forEach(el=>el.oninput=e=>{const k=e.target.dataset.r;v[k]=k==='descrizione'?e.target.value:S.num(e.target.value);tr.querySelector('.row-total').textContent=S.euro(S.num(v.quantita)*S.num(v.prezzoUnitario));changed();renderTotals()});tr.querySelector('[data-del]').onclick=()=>{state.preventivo.voci=state.preventivo.voci.filter(x=>x.id!==v.id);changed();renderPricing();renderTotals()}})}
+function renderPricing(){
+ const body=$('pricingRows');
+ body.innerHTML=state.preventivo.voci.map(v=>`<tr data-id="${v.id}"><td class="pricing-desc-cell"><button type="button" class="price-drag" data-drag aria-label="Trascina per riordinare" title="Trascina per riordinare · frecce ↑ ↓ da tastiera">⋮⋮</button><input data-r="descrizione" value="${S.attr(v.descrizione)}" placeholder="es. Centrotavola"></td><td><input data-r="quantita" type="number" min="0" step="0.1" value="${v.quantita}"></td><td><input data-r="prezzoUnitario" type="number" min="0" step="0.01" value="${v.prezzoUnitario}"></td><td class="row-total">${S.euro(S.num(v.quantita)*S.num(v.prezzoUnitario))}</td><td><button class="danger" data-del>×</button></td></tr>`).join('');
+ body.querySelectorAll('tr').forEach(tr=>{
+  const v=state.preventivo.voci.find(x=>x.id===tr.dataset.id);
+  tr.querySelectorAll('[data-r]').forEach(el=>el.oninput=e=>{
+   const k=e.target.dataset.r;v[k]=k==='descrizione'?e.target.value:S.num(e.target.value);
+   tr.querySelector('.row-total').textContent=S.euro(S.num(v.quantita)*S.num(v.prezzoUnitario));
+   changed();renderTotals()
+  });
+  tr.querySelector('[data-del]').onclick=()=>{
+   state.preventivo.voci=state.preventivo.voci.filter(x=>x.id!==v.id);
+   changed();renderPricing();renderTotals()
+  }
+ });
+ enablePricingDrag(body)
+}
+
+function reorderPricingFromDom(body){
+ const ids=[...body.querySelectorAll('tr[data-id]')].map(r=>r.dataset.id);
+ const map=new Map(state.preventivo.voci.map(v=>[v.id,v]));
+ const next=ids.map(id=>map.get(id)).filter(Boolean);
+ if(next.length!==state.preventivo.voci.length)return;
+ const changedOrder=next.some((v,i)=>v!==state.preventivo.voci[i]);
+ if(!changedOrder)return;
+ state.preventivo.voci=next;
+ changed();renderTotals()
+}
+function movePricingKeyboard(id,dir){
+ const i=state.preventivo.voci.findIndex(v=>v.id===id),j=i+dir;
+ if(i<0||j<0||j>=state.preventivo.voci.length)return;
+ [state.preventivo.voci[i],state.preventivo.voci[j]]=[state.preventivo.voci[j],state.preventivo.voci[i]];
+ changed();renderPricing();renderTotals();
+ setTimeout(()=>$('pricingRows')?.querySelector(\`tr[data-id="\${id}"] [data-drag]\`)?.focus(),0)
+}
+function enablePricingDrag(body){
+ body.querySelectorAll('[data-drag]').forEach(handle=>{
+  handle.onkeydown=e=>{
+   if(e.key==='ArrowUp'){e.preventDefault();movePricingKeyboard(handle.closest('tr').dataset.id,-1)}
+   if(e.key==='ArrowDown'){e.preventDefault();movePricingKeyboard(handle.closest('tr').dataset.id,1)}
+  };
+  let dragged=null,pointerId=null;
+  const finish=()=>{
+   if(!dragged)return;
+   dragged.classList.remove('is-dragging');
+   document.body.classList.remove('price-reordering');
+   reorderPricingFromDom(body);
+   dragged=null;pointerId=null
+  };
+  handle.onpointerdown=e=>{
+   if(e.pointerType==='mouse'&&e.button!==0)return;
+   dragged=handle.closest('tr');if(!dragged)return;
+   pointerId=e.pointerId;
+   handle.setPointerCapture?.(pointerId);
+   dragged.classList.add('is-dragging');
+   document.body.classList.add('price-reordering');
+   e.preventDefault()
+  };
+  handle.onpointermove=e=>{
+   if(!dragged||e.pointerId!==pointerId)return;
+   const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('#pricingRows tr[data-id]');
+   if(!target||target===dragged)return;
+   const rect=target.getBoundingClientRect(),after=e.clientY>rect.top+rect.height/2;
+   body.insertBefore(dragged,after?target.nextSibling:target)
+  };
+  handle.onpointerup=finish;
+  handle.onpointercancel=finish;
+  handle.onlostpointercapture=finish
+ })
+}
+function proposalPricingLine(v){
+ const labor=S.num(state.preventivo.manodoperaPct),planner=S.num(state.preventivo.weddingPlannerPct),k=1+(labor+planner)/100;
+ const q=S.num(v.quantita),unit=S.round(S.num(v.prezzoUnitario)*k),line=S.round(q*unit);
+ const qty=q.toLocaleString('it-IT',{maximumFractionDigits:2});
+ const desc=String(v.descrizione||'Voce').trim()||'Voce';
+ return q===1?\`\${desc} · \${S.euro(unit)}\`:\`\${desc} · \${qty} × \${S.euro(unit)} = \${S.euro(line)}\`
+}
+function openPricingCopyModal(pageId){
+ pricingCopyTargetId=pageId;
+ const page=state.pagine.find(p=>p.id===pageId);if(!page)return;
+ $('copyPricingTarget').textContent='Pagina: '+(page.titolo||page.sezione||'Proposta');
+ const rows=state.preventivo.voci||[];
+ $('pricingCopyList').innerHTML=rows.length?rows.map(v=>{
+  const q=S.num(v.quantita),labor=S.num(state.preventivo.manodoperaPct),planner=S.num(state.preventivo.weddingPlannerPct),k=1+(labor+planner)/100;
+  const unit=S.round(S.num(v.prezzoUnitario)*k),line=S.round(q*unit);
+  return \`<label class="pricing-copy-item"><input type="checkbox" value="\${S.attr(v.id)}"><span class="pricing-copy-item-main"><b>\${S.esc(v.descrizione||'Voce senza descrizione')}</b><small>Q.tà \${q.toLocaleString('it-IT',{maximumFractionDigits:2})} · \${S.euro(unit)} cad.</small></span><span class="pricing-copy-item-price">\${S.euro(line)}</span></label>\`
+ }).join(''):'<div class="pricing-copy-empty">Non ci sono ancora voci nel preventivo.</div>';
+ const append=document.querySelector('input[name="pricingCopyMode"][value="append"]');if(append)append.checked=true;
+ $('copyPricingModal').hidden=false;
+ setTimeout(()=>$('pricingCopyList')?.querySelector('input[type="checkbox"]')?.focus(),30)
+}
+function closePricingCopyModal(){
+ $('copyPricingModal').hidden=true;
+ pricingCopyTargetId=null
+}
+function insertSelectedPricingIntoProposal(){
+ const page=state.pagine.find(p=>p.id===pricingCopyTargetId);if(!page)return;
+ const ids=[...document.querySelectorAll('#pricingCopyList input[type="checkbox"]:checked')].map(x=>x.value);
+ if(!ids.length){alert('Seleziona almeno una voce del preventivo.');return}
+ const map=new Map(state.preventivo.voci.map(v=>[v.id,v]));
+ const lines=ids.map(id=>map.get(id)).filter(Boolean).map(proposalPricingLine);
+ const mode=document.querySelector('input[name="pricingCopyMode"]:checked')?.value||'append';
+ const existing=String(page.prezzoTesto||'').trim();
+ page.prezzoTesto=mode==='replace'?lines.join('\n'):[existing,lines.join('\n')].filter(Boolean).join('\n');
+ changed();closePricingCopyModal();renderProposals()
+}
 function renderBonuses(){
  state=S.migrateProject(state);
  const host=$('bonusList');if(!host)return;
