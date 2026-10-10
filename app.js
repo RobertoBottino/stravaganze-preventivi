@@ -151,33 +151,42 @@ function enablePricingDrag(body){
    if(e.key==='ArrowUp'){e.preventDefault();movePricingKeyboard(handle.closest('tr').dataset.id,-1)}
    if(e.key==='ArrowDown'){e.preventDefault();movePricingKeyboard(handle.closest('tr').dataset.id,1)}
   };
-  let dragged=null,pointerId=null;
-  const finish=()=>{
-   if(!dragged)return;
-   dragged.classList.remove('is-dragging');
-   document.body.classList.remove('price-reordering');
-   reorderPricingFromDom(body);
-   dragged=null;pointerId=null
-  };
   handle.onpointerdown=e=>{
    if(e.pointerType==='mouse'&&e.button!==0)return;
-   dragged=handle.closest('tr');if(!dragged)return;
-   pointerId=e.pointerId;
-   handle.setPointerCapture?.(pointerId);
+   const dragged=handle.closest('tr');if(!dragged)return;
+   const pointerId=e.pointerId;
    dragged.classList.add('is-dragging');
    document.body.classList.add('price-reordering');
+   handle.setPointerCapture?.(pointerId);
+
+   const move=ev=>{
+    if(ev.pointerId!==pointerId)return;
+    ev.preventDefault();
+    const rows=[...body.querySelectorAll('tr[data-id]')].filter(r=>r!==dragged);
+    let before=null;
+    for(const row of rows){
+      const rect=row.getBoundingClientRect();
+      if(ev.clientY<rect.top+rect.height/2){before=row;break}
+    }
+    if(before)body.insertBefore(dragged,before);
+    else body.appendChild(dragged)
+   };
+   const finish=ev=>{
+    if(ev&&ev.pointerId!=null&&ev.pointerId!==pointerId)return;
+    document.removeEventListener('pointermove',move,{capture:true});
+    document.removeEventListener('pointerup',finish,{capture:true});
+    document.removeEventListener('pointercancel',finish,{capture:true});
+    dragged.classList.remove('is-dragging');
+    document.body.classList.remove('price-reordering');
+    try{handle.releasePointerCapture?.(pointerId)}catch{}
+    reorderPricingFromDom(body)
+   };
+
+   document.addEventListener('pointermove',move,{capture:true,passive:false});
+   document.addEventListener('pointerup',finish,{capture:true});
+   document.addEventListener('pointercancel',finish,{capture:true});
    e.preventDefault()
-  };
-  handle.onpointermove=e=>{
-   if(!dragged||e.pointerId!==pointerId)return;
-   const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('#pricingRows tr[data-id]');
-   if(!target||target===dragged)return;
-   const rect=target.getBoundingClientRect(),after=e.clientY>rect.top+rect.height/2;
-   body.insertBefore(dragged,after?target.nextSibling:target)
-  };
-  handle.onpointerup=finish;
-  handle.onpointercancel=finish;
-  handle.onlostpointercapture=finish
+  }
  })
 }
 function proposalPricingLine(v){
