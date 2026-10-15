@@ -15,9 +15,9 @@ S.minusDays=(iso,n)=>{if(!iso)return'';const[y,m,d]=iso.split('-').map(Number),x
 S.fileName=s=>(s||'preventivo').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'');
 
 S.openDb=()=>new Promise((ok,ko)=>{const r=indexedDB.open(S.DB,1);r.onupgradeneeded=()=>{for(const n of[S.PROJECTS,S.ASSETS,S.SETTINGS])if(!r.result.objectStoreNames.contains(n))r.result.createObjectStore(n,{keyPath:'id'})};r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)});
-S.put=async(store,value)=>{const db=await S.openDb();return new Promise((ok,ko)=>{const tx=db.transaction(store,'readwrite');tx.objectStore(store).put(value);tx.oncomplete=()=>{db.close();ok(value)};tx.onerror=()=>ko(tx.error)})};
+S.put=async(store,value)=>{const db=await S.openDb();const out=await new Promise((ok,ko)=>{const tx=db.transaction(store,'readwrite');tx.objectStore(store).put(value);tx.oncomplete=()=>{db.close();ok(value)};tx.onerror=()=>ko(tx.error)});if(store===S.PROJECTS&&!S.DriveSync?.suppress)queueMicrotask(()=>S.DriveSync?.queueProject?.(value?.id));return out};
 S.get=async(store,id)=>{const db=await S.openDb();return new Promise((ok,ko)=>{const tx=db.transaction(store),r=tx.objectStore(store).get(id);r.onsuccess=()=>{db.close();ok(r.result)};r.onerror=()=>ko(r.error)})};
-S.del=async(store,id)=>{const db=await S.openDb();return new Promise((ok,ko)=>{const tx=db.transaction(store,'readwrite');tx.objectStore(store).delete(id);tx.oncomplete=()=>{db.close();ok()};tx.onerror=()=>ko(tx.error)})};
+S.del=async(store,id)=>{const db=await S.openDb();await new Promise((ok,ko)=>{const tx=db.transaction(store,'readwrite');tx.objectStore(store).delete(id);tx.oncomplete=()=>{db.close();ok()};tx.onerror=()=>ko(tx.error)});if(store===S.PROJECTS&&!S.DriveSync?.suppress)queueMicrotask(()=>S.DriveSync?.queueDelete?.(id))};
 S.all=async store=>{const db=await S.openDb();return new Promise((ok,ko)=>{const tx=db.transaction(store),r=tx.objectStore(store).getAll();r.onsuccess=()=>{db.close();ok(r.result||[])};r.onerror=()=>ko(r.error)})};
 
 S.calc=p=>{
