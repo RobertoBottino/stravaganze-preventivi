@@ -4,7 +4,7 @@ window.SF=window.SF||{};
 const S=window.SF,$=id=>document.getElementById(id);
 const CONFIG={
   clientId:'1000108506944-2q4i2g0u7urc5iq9vik5it02bb4gruta.apps.googleusercontent.com',
-  scopes:'https://www.googleapis.com/auth/forms.body.readonly https://www.googleapis.com/auth/forms.responses.readonly',
+  scopes:'https://www.googleapis.com/auth/forms.body.readonly https://www.googleapis.com/auth/forms.responses.readonly https://www.googleapis.com/auth/drive.appdata',
   forms:{
     it:{id:'1lf7MkwCNh1XglytlhGBKeH2GNxSCn0UdmWDeWJ_PVdY',label:'Italiano'},
     en:{id:'1DoEekECeP1ZO20sp84ZHpqYL4Kk1f3JXu2YHkKNRMro',label:'English'}
@@ -81,6 +81,7 @@ function tokenCallback(resp){
     state.accessToken=resp.access_token;
     state.tokenExpiresAt=Date.now()+Math.max(60,Number(resp.expires_in||3600))*1000;
     renderAuthState();
+    window.dispatchEvent(new CustomEvent('sf-google-auth',{detail:{connected:true,expiresAt:state.tokenExpiresAt}}));
     pending?.resolve(resp);
   }else{
     const e=new Error(resp?.error_description||resp?.error||'Accesso Google non riuscito.');
@@ -103,8 +104,18 @@ async function connectGoogle(selectAccount){
 }
 function clearToken(){
   state.accessToken='';state.tokenExpiresAt=0;renderAuthState();
+  window.dispatchEvent(new CustomEvent('sf-google-auth',{detail:{connected:false}}));
 }
 function hasToken(){return Boolean(state.accessToken&&Date.now()<state.tokenExpiresAt-30000)}
+S.GoogleAuth={
+  hasToken,
+  getAccessToken:()=>hasToken()?state.accessToken:'',
+  getExpiresAt:()=>state.tokenExpiresAt,
+  connect:selectAccount=>connectGoogle(Boolean(selectAccount)),
+  clear:clearToken,
+  scopes:CONFIG.scopes
+};
+
 function renderAuthState(){
   const connected=hasToken();
   document.querySelectorAll('[data-google-state]').forEach(el=>{
