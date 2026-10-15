@@ -1,0 +1,106 @@
+/* Archive + Google Drive integration — v46 */
+#archiveDrawer .drawer{width:min(570px,96vw)}
+.archive-cloud-panel{
+  margin:12px 0 14px;
+  padding:13px 14px;
+  border:1px solid #d9e3d4;
+  border-radius:14px;
+  background:#f4f8f1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.archive-cloud-copy{min-width:0}
+.archive-cloud-copy>div{display:flex;align-items:center;gap:8px}
+.archive-cloud-copy b{color:var(--sf-green,#536345);font-size:13px}
+.archive-cloud-copy small{
+  display:block;
+  margin-top:4px;
+  color:var(--sf-muted,#6e776a);
+  font-size:11px;
+  line-height:1.42;
+}
+.archive-cloud-dot{
+  width:9px;height:9px;border-radius:50%;
+  background:#a7ada2;
+  box-shadow:0 0 0 3px rgba(167,173,162,.14);
+  flex:0 0 auto;
+}
+.archive-cloud-dot.connected{background:#6c915c;box-shadow:0 0 0 3px rgba(108,145,92,.14)}
+.archive-cloud-dot.disconnected{background:#a7ada2}
+.archive-cloud-panel .btn{min-height:40px;flex:0 0 auto;padding:8px 11px;font-size:11px}
+.archive-filter-label{
+  margin:10px 2px 5px;
+  color:#818a7b;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+}
+.archive-cloud-filters button{font-size:10px}
+.archive-badges{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+  margin-bottom:6px;
+}
+.cloud-project-pill{
+  display:inline-flex;
+  align-items:center;
+  min-height:23px;
+  padding:4px 8px;
+  border-radius:999px;
+  border:1px solid #d9e1d5;
+  background:#f4f6f2;
+  color:#687164;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.02em;
+  white-space:nowrap;
+}
+.cloud-project-pill.cloud-synced{background:#eaf3e5;border-color:#d1e2c9;color:#46633c}
+.cloud-project-pill.cloud-pending{background:#fff7e4;border-color:#eadbb1;color:#7b6737}
+.cloud-project-pill.cloud-local{background:#f3f4f1;border-color:#dde1da;color:#6f766b}
+.cloud-project-pill.cloud-cloud-newer{background:#eaf1f5;border-color:#cedde5;color:#476675}
+.cloud-project-pill.cloud-conflict{background:#faecea;border-color:#eac8c4;color:#914b45}
+.cloud-project-pill.cloud-unknown{background:#f3f4f1;border-color:#dde1da;color:#767c72}
+.archive-card .archive-details{
+  display:grid;
+  gap:7px;
+  margin-top:8px;
+}
+.archive-card .archive-details>span{
+  display:grid;
+  grid-template-columns:64px minmax(0,1fr);
+  gap:7px;
+  align-items:baseline;
+}
+.archive-card .archive-details .detail-label{flex:none}
+.archive-card .archive-details>small{
+  margin-top:2px;
+  color:#8b9286;
+  font-size:10px;
+}
+.archive-summary{align-items:center}
+#archiveCloudSummary{color:#75806f;font-size:10px}
+.archive-actions [data-cloud-sync]{border-color:#cbd9c4;color:var(--sf-green,#536345);background:#f7faf5}
+@media(max-width:700px){
+  #archiveDrawer .drawer{width:100%;max-width:none}
+  .archive-cloud-panel{align-items:stretch;flex-direction:column}
+  .archive-cloud-panel .btn{width:100%;min-height:44px}
+  .archive-cloud-filters{
+    display:flex;
+    overflow-x:auto;
+    flex-wrap:nowrap!important;
+    padding-bottom:3px;
+    scrollbar-width:none;
+  }
+  .archive-cloud-filters::-webkit-scrollbar{display:none}
+  .archive-cloud-filters button{flex:0 0 auto}
+}
+@media(max-width:420px){
+  .archive-card .archive-details>span{grid-template-columns:58px minmax(0,1fr)}
+  .cloud-project-pill{white-space:normal}
+}
