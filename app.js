@@ -11,7 +11,7 @@ const defs=[
  ['telefono','Telefono responsabile','tel']
 ];
 document.addEventListener('DOMContentLoaded',init);
-async function init(){wire();renderFields();const last=localStorage.getItem('sf-last');if(last)state=S.migrateProject((await S.get(S.PROJECTS,last))||state);renderAll();await renderTemplate();registerServiceWorkerAggressive().catch(console.warn)}
+async function init(){wire();renderFields();const last=localStorage.getItem('sf-last');if(last)state=S.migrateProject((await S.get(S.PROJECTS,last))||state);renderAll();await renderTemplate();window.addEventListener('sf-drive-project-updated',handleCloudProjectUpdated);registerServiceWorkerAggressive().catch(console.warn)}
 
 async function registerServiceWorkerAggressive(){
  if(!('serviceWorker'in navigator)||location.protocol==='file:')return;
@@ -30,7 +30,7 @@ async function registerServiceWorkerAggressive(){
   location.reload();
  });
 
- const reg=await navigator.serviceWorker.register('./sw.js?v=44',{updateViaCache:'none'});
+ const reg=await navigator.serviceWorker.register('./sw.js?v=45',{updateViaCache:'none'});
 
  const activateNow=worker=>{
   if(!worker)return;
@@ -259,6 +259,11 @@ function renderTotals(){
    :'Inserisci il totale finale concordato.';
  }
  renderHeader()
+}
+async function handleCloudProjectUpdated(e){
+ const id=e.detail?.id;if(!id||id!==state.id)return;
+ const cloud=await S.get(S.PROJECTS,id);if(!cloud)return;
+ state=S.migrateProject(cloud);renderAll();clearGeneratedPdf()
 }
 function clearGeneratedPdf(){generatedPdfBytes=null;generatedPdfName='';const box=$('pdfReady');if(box)box.hidden=true}
 function changed(){clearGeneratedPdf();$('saveState').textContent='Salvataggio…';$('saveState').classList.add('saving');clearTimeout(saveTimer);saveTimer=setTimeout(save,450)}
