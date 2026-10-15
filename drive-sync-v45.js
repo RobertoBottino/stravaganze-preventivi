@@ -20,7 +20,9 @@ S.DriveSync={
   queueProject,
   queueDelete,
   syncAll,
-  status:()=>({syncing:state.syncing,conflicts:state.conflicts.size})
+  syncNow:()=>ensureConnectedAndSync(true),
+  getArchiveInfo,
+  status:()=>({syncing:state.syncing,conflicts:state.conflicts.size,connected:Boolean(S.GoogleAuth?.hasToken?.())})
 };
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -62,6 +64,15 @@ function cloneForCloud(p){return JSON.parse(JSON.stringify(p))}
 function safeName(p){
   const names=[p?.dati?.nomeSposa,p?.dati?.nomeSposo].filter(Boolean).join('_')||p?.id||'preventivo';
   return FILE_PREFIX+S.fileName(names)+'_'+p.id+'.json'
+}
+function deviceLabel(){
+  const ua=navigator.userAgent||'',platform=navigator.platform||'';
+  if(/iPhone/i.test(ua))return'iPhone';
+  if(/iPad/i.test(ua)||(/Mac/i.test(platform)&&navigator.maxTouchPoints>1))return'iPad';
+  if(/Android/i.test(ua))return'Android';
+  if(/Win/i.test(platform)||/Windows/i.test(ua))return'Windows';
+  if(/Mac/i.test(platform)||/Macintosh/i.test(ua))return'Mac';
+  return'Web'
 }
 
 async function driveFetch(url,opts={}){
@@ -135,7 +146,7 @@ async function uploadProject(p,file){
   const metadata={
     name:safeName(p),
     mimeType:MIME,
-    appProperties:{sfType:'project',projectId:String(p.id),updatedAt:String(updatedAt),status:String(p.status||'bozza')}
+    appProperties:{sfType:'project',projectId:String(p.id),updatedAt:String(updatedAt),status:String(p.status||'bozza'),device:deviceLabel()}
   };
   let result;
   if(file?.id){
@@ -213,7 +224,7 @@ async function putRemoteLocally(p,remoteUpdatedAt,fileId,cfg){
   try{await S.put(S.PROJECTS,p)}
   finally{state.suppress=false}
   cfg.projects=cfg.projects||{};
-  cfg.projects[p.id]={fileId,lastSyncedUpdatedAt:remoteUpdatedAt||p.updatedAt||''};
+  cfg.projects[p.id]={fileId,lastSyncedUpdatedAt:remoteUpdatedAt||p.updatedAt||'',lastSyncedAt:new Date().toISOString(),lastSyncedDevice:'Drive'};
   await saveSettings(cfg);
   window.dispatchEvent(new CustomEvent('sf-drive-project-updated',{detail:{id:p.id,source:'cloud'}}))
 }
@@ -234,7 +245,7 @@ async function pushOne(p,forceLocal){
   }
   const saved=await uploadProject(p,file);
   cfg.projects=cfg.projects||{};
-  cfg.projects[p.id]={fileId:saved.id,lastSyncedUpdatedAt:localU};
+  cfg.projects[p.id]={fileId:saved.id,lastSyncedUpdatedAt:localU,lastSyncedAt:new Date().toISOString(),lastSyncedDevice:deviceLabel()};
   await saveSettings(cfg);
   state.conflicts.delete(p.id);
   setStatus(state.conflicts.size?'conflict':'synced');
@@ -254,7 +265,7 @@ async function resolveConflict(id,local,remote,cfg,interactive){
   );
   if(keepLocal){
     const saved=await uploadProject(local,remote);
-    cfg.projects[id]={fileId:saved.id,lastSyncedUpdatedAt:local.updatedAt||''};
+    cfg.projects[id]={fileId:saved.id,lastSyncedUpdatedAt:local.updatedAt||'',lastSyncedAt:new Date().toISOString(),lastSyncedDevice:deviceLabel()};
     await saveSettings(cfg);
     state.conflicts.delete(id);
     return 'uploaded'
@@ -282,7 +293,7 @@ async function syncAll({interactive=false,reason='manual'}={}){
       const local=localMap.get(id),file=remote.get(id),meta=cfg.projects[id];
       if(local&&!file){
         const saved=await uploadProject(local,null);
-        cfg.projects[id]={fileId:saved.id,lastSyncedUpdatedAt:local.updatedAt||''};
+        cfg.projects[id]={fileId:saved.id,lastSyncedUpdatedAt:local.updatedAt||'',lastSyncedAt:new Date().toISOString(),lastSyncedDevice:deviceLabel()};
         changed=true;continue
       }
       if(!local&&file){
@@ -307,7 +318,7 @@ async function syncAll({interactive=false,reason='manual'}={}){
         }
         if(localChanged&&!remoteChanged){
           const saved=await uploadProject(local,file);
-          cfg.projects[id]={fileId:saved.id,lastSyncedUpdatedAt:localU};
+          cfg.projects[id]={fileId:saved.id,lastSyncedUpdatedAt:localU,lastSyncedAt:new Date().toISOString(),lastSyncedDevice:deviceLabel()};
           changed=true;continue
         }
       }else{
@@ -317,10 +328,10 @@ async function syncAll({interactive=false,reason='manual'}={}){
           changed=true
         }else if(isoMs(localU)>isoMs(remoteU)){
           const saved=await uploadProject(local,file);
-          cfg.projects[id]={fileId:saved.id,lastSyncedUpdatedAt:localU};
+          cfg.projects[id]={fileId:saved.id,lastSyncedUpdatedAt:localU,lastSyncedAt:new Date().toISOString(),lastSyncedDevice:deviceLabel()};
           changed=true
         }else{
-          cfg.projects[id]={fileId:file.id,lastSyncedUpdatedAt:localU||remoteU}
+          cfg.projects[id]={fileId:file.id,lastSyncedUpdatedAt:localU||remoteU,lastSyncedAt:new Date().toISOString(),lastSyncedDevice:file.appProperties?.device||'Drive'}
         }
       }
     }
@@ -330,6 +341,66 @@ async function syncAll({interactive=false,reason='manual'}={}){
   }finally{
     state.syncing=false;
     if(!state.conflicts.size&&S.GoogleAuth?.hasToken?.())setStatus('synced')
+  }
+}
+
+
+async function getArchiveInfo(force=false){
+  const connected=Boolean(S.GoogleAuth?.hasToken?.());
+  const cfg=await loadSettings();
+  cfg.projects=cfg.projects||{};
+  let remote=state.remoteMap;
+  if(connected){
+    try{remote=await listRemoteProjects(Boolean(force))}
+    catch(e){console.warn('Lettura stato Drive archivio non riuscita',e)}
+  }
+  const locals=(await S.all(S.PROJECTS)).map(S.migrateProject);
+  const projects={};
+  let synced=0,pending=0,conflicts=0,onlyLocal=0,cloudNewer=0;
+  for(const p of locals){
+    const file=remote.get(p.id),meta=cfg.projects[p.id]||{},localU=p.updatedAt||'';
+    const remoteU=file?.appProperties?.updatedAt||file?.modifiedTime||'';
+    const base=meta.lastSyncedUpdatedAt||'';
+    let cloudStatus='local';
+    if(state.conflicts.has(p.id))cloudStatus='conflict';
+    else if(file){
+      if(base){
+        const localChanged=!sameVersion(localU,base),remoteChanged=!sameVersion(remoteU,base);
+        if(localChanged&&remoteChanged&&!sameVersion(localU,remoteU))cloudStatus='conflict';
+        else if(remoteChanged&&!localChanged)cloudStatus='cloud-newer';
+        else if(localChanged&&!remoteChanged)cloudStatus='pending';
+        else cloudStatus='synced';
+      }else{
+        if(isoMs(remoteU)>isoMs(localU))cloudStatus='cloud-newer';
+        else if(isoMs(localU)>isoMs(remoteU))cloudStatus='pending';
+        else cloudStatus='synced'
+      }
+    }else if(meta.fileId&&!connected&&sameVersion(base,localU)){
+      cloudStatus='synced'
+    }else cloudStatus='local';
+
+    if(cloudStatus==='synced')synced++;
+    else if(cloudStatus==='conflict')conflicts++;
+    else if(cloudStatus==='cloud-newer')cloudNewer++;
+    else if(cloudStatus==='local')onlyLocal++;
+    else pending++;
+
+    projects[p.id]={
+      status:cloudStatus,
+      connected,
+      hasRemote:Boolean(file||meta.fileId),
+      lastSyncedAt:meta.lastSyncedAt||'',
+      lastSyncedDevice:file?.appProperties?.device||meta.lastSyncedDevice||'',
+      remoteModifiedAt:file?.modifiedTime||'',
+      remoteUpdatedAt:remoteU,
+      localUpdatedAt:localU
+    }
+  }
+  return{
+    connected,
+    syncing:state.syncing,
+    counts:{total:locals.length,synced,pending,conflicts,onlyLocal,cloudNewer},
+    projects
   }
 }
 
