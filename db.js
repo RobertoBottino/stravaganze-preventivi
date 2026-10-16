@@ -28,32 +28,39 @@ S.calc=p=>{
   const vat=S.round(taxable*S.num(p.preventivo.ivaPct)/100);
   const rawTotal=S.round(taxable+vat);
 
+  // Il totale manuale cambia solo il totale finale: le singole voci restano intatte.
   const totalOverrideEnabled=Boolean(p.preventivo.totaleArrotondatoAttivo);
   const totalOverrideValue=S.round(p.preventivo.totaleArrotondato);
-  const hasOverride=totalOverrideEnabled&&totalOverrideValue>0&&totalOverrideValue!==rawTotal;
-  const total=hasOverride?totalOverrideValue:rawTotal;
+  const hasDirectTotalOverride=totalOverrideEnabled&&totalOverrideValue>0&&totalOverrideValue!==rawTotal;
+  const quoteTotal=hasDirectTotalOverride?totalOverrideValue:rawTotal;
 
-  const rawDeposit=S.round(total*.30);
+  // Il 30/70 di riferimento viene calcolato sul totale prima degli arrotondamenti dei pagamenti.
+  const rawDeposit=S.round(quoteTotal*.30);
   const depositOverrideEnabled=Boolean(p.preventivo.caparraArrotondataAttiva);
   const depositOverrideValue=S.round(p.preventivo.caparraArrotondata);
   const hasDepositOverride=depositOverrideEnabled&&depositOverrideValue>0&&depositOverrideValue!==rawDeposit;
   const deposit=hasDepositOverride?depositOverrideValue:rawDeposit;
 
-  const rawBalance=S.round(total*.70);
+  const rawBalance=S.round(quoteTotal*.70);
   const balanceOverrideEnabled=Boolean(p.preventivo.saldoArrotondatoAttivo);
   const balanceOverrideValue=S.round(p.preventivo.saldoArrotondato);
   const hasBalanceOverride=balanceOverrideEnabled&&balanceOverrideValue>0&&balanceOverrideValue!==rawBalance;
   const balance=hasBalanceOverride?balanceOverrideValue:rawBalance;
 
+  // Se si arrotonda caparra e/o saldo, il totale finale diventa la loro somma.
+  // Non vengono ricalcolati prezzi, imponibile o IVA.
+  const hasPaymentOverride=hasDepositOverride||hasBalanceOverride;
   const paymentSum=S.round(deposit+balance);
-  const paymentDifference=S.round(total-paymentSum);
+  const total=hasPaymentOverride?paymentSum:quoteTotal;
+  const paymentDifference=0;
+  const hasOverride=total!==rawTotal;
 
   return{
     base,lab,planner,taxable,vat,
-    rawTotal,total,hasOverride,
+    rawTotal,quoteTotal,total,hasOverride,hasDirectTotalOverride,
     rawDeposit,deposit,hasDepositOverride,
     rawBalance,balance,hasBalanceOverride,
-    paymentSum,paymentDifference
+    hasPaymentOverride,paymentSum,paymentDifference
   };
 };
 
