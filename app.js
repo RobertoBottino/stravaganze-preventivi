@@ -272,7 +272,7 @@ function renderTotals(){
  const cells=[['Base',t.base,''],['Manodopera',t.lab,''],['Wedding planner',t.planner,''],['Imponibile',t.taxable,''],['IVA',t.vat,'']];
  if(t.hasOverride){
   cells.push(['Totale calcolato',t.rawTotal,'grand old-grand']);
-  cells.push(['Totale concordato',t.total,'grand final-grand']);
+  cells.push(['Totale finale',t.total,'grand final-grand']);
  }else cells.push(['Totale',t.rawTotal,'grand']);
 
  if(t.hasDepositOverride){
@@ -289,8 +289,9 @@ function renderTotals(){
 
  if(totalEnabled){
   const rounded=S.num(p.totaleArrotondato);
-  $('roundTotalPreview').innerHTML=rounded>0
-   ?`Nel PDF: <span class="old-total">${S.euro(t.rawTotal)}</span><span class="new-total">${S.euro(rounded)}</span> · 30% ${S.euro(t.rawDeposit)} · 70% ${S.euro(t.rawBalance)}`
+  const direct=rounded>0?rounded:t.quoteTotal;
+  $('roundTotalPreview').innerHTML=direct>0
+   ?`Totale impostato: <span class="old-total">${S.euro(t.rawTotal)}</span><span class="new-total">${S.euro(direct)}</span>${t.hasPaymentOverride?' · il totale finale viene poi adeguato a caparra + saldo':''}`
    :'Inserisci il totale finale concordato.';
  }
  if(depositEnabled){
@@ -307,12 +308,11 @@ function renderTotals(){
  }
 
  const consistency=$('paymentConsistency');
- const anyPaymentOverride=t.hasDepositOverride||t.hasBalanceOverride;
- consistency.hidden=!anyPaymentOverride||Math.abs(t.paymentDifference)<.005;
+ consistency.hidden=!t.hasPaymentOverride;
  if(!consistency.hidden){
-  const sign=t.paymentDifference>0?'mancano':'eccedono';
-  consistency.innerHTML=`<b>Controllo importi:</b> caparra + saldo = ${S.euro(t.paymentSum)}. Rispetto al totale di ${S.euro(t.total)} ${sign} <strong>${S.euro(Math.abs(t.paymentDifference))}</strong>.`
- }
+  consistency.classList.add('is-adjusted');
+  consistency.innerHTML=`<b>Totale aggiornato automaticamente:</b> ${S.euro(t.deposit)} + ${S.euro(t.balance)} = <strong>${S.euro(t.total)}</strong>. Le voci del preventivo, l'imponibile e l'IVA non vengono ricalcolati.`
+ }else consistency.classList.remove('is-adjusted');
 
  renderHeader()
 }
