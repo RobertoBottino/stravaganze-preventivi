@@ -27,13 +27,34 @@ S.calc=p=>{
   const taxable=S.round(base+lab+planner);
   const vat=S.round(taxable*S.num(p.preventivo.ivaPct)/100);
   const rawTotal=S.round(taxable+vat);
-  const overrideEnabled=Boolean(p.preventivo.totaleArrotondatoAttivo);
-  const overrideValue=S.round(p.preventivo.totaleArrotondato);
-  const hasOverride=overrideEnabled&&overrideValue>0&&overrideValue!==rawTotal;
-  const total=hasOverride?overrideValue:rawTotal;
-  const deposit=S.round(total*.30);
-  const balance=S.round(total*.70);
-  return{base,lab,planner,taxable,vat,rawTotal,total,deposit,balance,hasOverride};
+
+  const totalOverrideEnabled=Boolean(p.preventivo.totaleArrotondatoAttivo);
+  const totalOverrideValue=S.round(p.preventivo.totaleArrotondato);
+  const hasOverride=totalOverrideEnabled&&totalOverrideValue>0&&totalOverrideValue!==rawTotal;
+  const total=hasOverride?totalOverrideValue:rawTotal;
+
+  const rawDeposit=S.round(total*.30);
+  const depositOverrideEnabled=Boolean(p.preventivo.caparraArrotondataAttiva);
+  const depositOverrideValue=S.round(p.preventivo.caparraArrotondata);
+  const hasDepositOverride=depositOverrideEnabled&&depositOverrideValue>0&&depositOverrideValue!==rawDeposit;
+  const deposit=hasDepositOverride?depositOverrideValue:rawDeposit;
+
+  const rawBalance=S.round(total*.70);
+  const balanceOverrideEnabled=Boolean(p.preventivo.saldoArrotondatoAttivo);
+  const balanceOverrideValue=S.round(p.preventivo.saldoArrotondato);
+  const hasBalanceOverride=balanceOverrideEnabled&&balanceOverrideValue>0&&balanceOverrideValue!==rawBalance;
+  const balance=hasBalanceOverride?balanceOverrideValue:rawBalance;
+
+  const paymentSum=S.round(deposit+balance);
+  const paymentDifference=S.round(total-paymentSum);
+
+  return{
+    base,lab,planner,taxable,vat,
+    rawTotal,total,hasOverride,
+    rawDeposit,deposit,hasDepositOverride,
+    rawBalance,balance,hasBalanceOverride,
+    paymentSum,paymentDifference
+  };
 };
 
 function under100(n){
@@ -68,7 +89,7 @@ S.moneyWords=n=>{
 S.toDataUrl=file=>new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>ko(r.error);r.readAsDataURL(file)});
 S.imageToJpeg=async(file,maxSide=1800,quality=.86)=>{const url=URL.createObjectURL(file);try{const img=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>ko(new Error('Immagine non leggibile'));i.src=url});const scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale)),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(img,0,0,w,h);return c.toDataURL('image/jpeg',quality)}finally{URL.revokeObjectURL(url)}};
 
-S.newProject=()=>({id:S.uuid(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),dati:{nomeSposa:'',nomeSposo:'',cerimonia:'',ricevimento:'',dataEvento:'',responsabile:'',telefono:''},preventivo:{voci:[],manodoperaPct:20,weddingPlannerPct:0,ivaPct:22,caparraPct:30,bonusItems:[],bonusDesc:'',bonusValue:0,totaleArrotondatoAttivo:false,totaleArrotondato:0},pagine:[]});
-S.migrateProject=p=>{p=p||S.newProject();p.dati=p.dati||{};if(!p.dati.cerimonia)p.dati.cerimonia=[p.dati.cerimoniaNome,p.dati.cerimoniaIndirizzo].filter(Boolean).join(', ');if(!p.dati.ricevimento)p.dati.ricevimento=[p.dati.ricevimentoNome,p.dati.ricevimentoIndirizzo].filter(Boolean).join(', ');p.preventivo=p.preventivo||{};p.preventivo.voci=p.preventivo.voci||[];p.preventivo.caparraPct=30;if(p.preventivo.weddingPlannerPct==null)p.preventivo.weddingPlannerPct=0;if(p.preventivo.totaleArrotondatoAttivo==null)p.preventivo.totaleArrotondatoAttivo=false;if(p.preventivo.totaleArrotondato==null)p.preventivo.totaleArrotondato=0;if(!Array.isArray(p.preventivo.bonusItems))p.preventivo.bonusItems=[];if(!p.preventivo.bonusItems.length&&(String(p.preventivo.bonusDesc||'').trim()||S.num(p.preventivo.bonusValue)>0))p.preventivo.bonusItems.push({id:S.uuid(),descrizione:String(p.preventivo.bonusDesc||''),valore:S.num(p.preventivo.bonusValue)});p.preventivo.bonusItems=p.preventivo.bonusItems.map(x=>({id:x.id||S.uuid(),descrizione:String(x.descrizione??x.description??''),valore:S.num(x.valore??x.value)}));p.pagine=p.pagine||[];return p};
+S.newProject=()=>({id:S.uuid(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),dati:{nomeSposa:'',nomeSposo:'',cerimonia:'',ricevimento:'',dataEvento:'',responsabile:'',telefono:''},preventivo:{voci:[],manodoperaPct:20,weddingPlannerPct:0,ivaPct:22,caparraPct:30,bonusItems:[],bonusDesc:'',bonusValue:0,totaleArrotondatoAttivo:false,totaleArrotondato:0,caparraArrotondataAttiva:false,caparraArrotondata:0,saldoArrotondatoAttivo:false,saldoArrotondato:0},pagine:[]});
+S.migrateProject=p=>{p=p||S.newProject();p.dati=p.dati||{};if(!p.dati.cerimonia)p.dati.cerimonia=[p.dati.cerimoniaNome,p.dati.cerimoniaIndirizzo].filter(Boolean).join(', ');if(!p.dati.ricevimento)p.dati.ricevimento=[p.dati.ricevimentoNome,p.dati.ricevimentoIndirizzo].filter(Boolean).join(', ');p.preventivo=p.preventivo||{};p.preventivo.voci=p.preventivo.voci||[];p.preventivo.caparraPct=30;if(p.preventivo.weddingPlannerPct==null)p.preventivo.weddingPlannerPct=0;if(p.preventivo.totaleArrotondatoAttivo==null)p.preventivo.totaleArrotondatoAttivo=false;if(p.preventivo.totaleArrotondato==null)p.preventivo.totaleArrotondato=0;if(p.preventivo.caparraArrotondataAttiva==null)p.preventivo.caparraArrotondataAttiva=false;if(p.preventivo.caparraArrotondata==null)p.preventivo.caparraArrotondata=0;if(p.preventivo.saldoArrotondatoAttivo==null)p.preventivo.saldoArrotondatoAttivo=false;if(p.preventivo.saldoArrotondato==null)p.preventivo.saldoArrotondato=0;if(!Array.isArray(p.preventivo.bonusItems))p.preventivo.bonusItems=[];if(!p.preventivo.bonusItems.length&&(String(p.preventivo.bonusDesc||'').trim()||S.num(p.preventivo.bonusValue)>0))p.preventivo.bonusItems.push({id:S.uuid(),descrizione:String(p.preventivo.bonusDesc||''),valore:S.num(p.preventivo.bonusValue)});p.preventivo.bonusItems=p.preventivo.bonusItems.map(x=>({id:x.id||S.uuid(),descrizione:String(x.descrizione??x.description??''),valore:S.num(x.valore??x.value)}));p.pagine=p.pagine||[];return p};
 S.defaultBusiness=()=>({id:'business'});
 })();
