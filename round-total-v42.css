@@ -76,3 +76,38 @@
 }
 .totals-card .final-grand small,
 .totals-card .final-grand b{color:var(--sf-green,#536345)!important}
+
+.round-payments-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+}
+.round-payment-box{margin-top:14px}
+.payment-consistency{
+  margin-top:10px;
+  padding:11px 13px;
+  border:1px solid #ead7aa;
+  border-radius:12px;
+  background:#fff8e7;
+  color:#735f31;
+  font-size:12px;
+  line-height:1.48;
+}
+.payment-consistency[hidden]{display:none!important}
+.payment-consistency b{color:#67542b}
+.totals-card .old-payment b{
+  text-decoration:line-through;
+  color:#8c9587!important;
+  font-weight:600!important;
+}
+.totals-card .old-payment small{color:#8c9587!important}
+.totals-card .final-payment{
+  background:#edf4e9;
+  border-radius:10px;
+  padding:9px 10px;
+}
+.totals-card .final-payment small,
+.totals-card .final-payment b{color:var(--sf-green,#536345)!important}
+@media(max-width:800px){
+  .round-payments-grid{grid-template-columns:1fr}
+}
