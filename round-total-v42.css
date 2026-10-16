@@ -111,3 +111,11 @@
 @media(max-width:800px){
   .round-payments-grid{grid-template-columns:1fr}
 }
+
+.payment-consistency.is-adjusted{
+  border-color:#cfe0c7;
+  background:#edf6e9;
+  color:#4d6544;
+}
+.payment-consistency.is-adjusted b,
+.payment-consistency.is-adjusted strong{color:#3f5d36}
