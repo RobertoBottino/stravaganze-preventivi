@@ -79,6 +79,18 @@ function wire(){
   changed();renderTotals()
  };
  $('roundedTotalValue').oninput=e=>{state.preventivo.totaleArrotondato=S.num(e.target.value);changed();renderTotals()};
+ $('roundDepositEnabled').onchange=e=>{
+  state.preventivo.caparraArrotondataAttiva=e.target.checked;
+  if(e.target.checked&&S.num(state.preventivo.caparraArrotondata)<=0)state.preventivo.caparraArrotondata=S.calc({...state,preventivo:{...state.preventivo,caparraArrotondataAttiva:false}}).rawDeposit;
+  changed();renderTotals()
+ };
+ $('roundedDepositValue').oninput=e=>{state.preventivo.caparraArrotondata=S.num(e.target.value);changed();renderTotals()};
+ $('roundBalanceEnabled').onchange=e=>{
+  state.preventivo.saldoArrotondatoAttivo=e.target.checked;
+  if(e.target.checked&&S.num(state.preventivo.saldoArrotondato)<=0)state.preventivo.saldoArrotondato=S.calc({...state,preventivo:{...state.preventivo,saldoArrotondatoAttivo:false}}).rawBalance;
+  changed();renderTotals()
+ };
+ $('roundedBalanceValue').oninput=e=>{state.preventivo.saldoArrotondato=S.num(e.target.value);changed();renderTotals()};
  $('addBonusBtn').onclick=()=>{state.preventivo.bonusItems=state.preventivo.bonusItems||[];state.preventivo.bonusItems.push({id:S.uuid(),descrizione:'',valore:0});changed();renderBonuses()};
  $('generateBtn').onclick=generate;$('sharePdfBtn').onclick=shareGeneratedPdf;$('downloadPdfBtn').onclick=downloadGeneratedPdf;$('backupBtn').onclick=backup;$('importBtn').onclick=()=>$('importFile').click();$('importFile').onchange=async e=>{const f=e.target.files?.[0];if(f)await importBackup(f);e.target.value=''};
  $('templateInput').onchange=async e=>{const f=e.target.files?.[0];if(f)await saveTemplate(f);e.target.value=''};$('storyRange').onchange=updateRanges;$('testRange').onchange=updateRanges;
@@ -240,24 +252,68 @@ function renderBonuses(){
 }
 function renderTotals(){
  const t=S.calc(state),p=state.preventivo;
- const enabled=Boolean(p.totaleArrotondatoAttivo);
- $('roundTotalEnabled').checked=enabled;
- $('roundTotalFields').hidden=!enabled;
+ const totalEnabled=Boolean(p.totaleArrotondatoAttivo),depositEnabled=Boolean(p.caparraArrotondataAttiva),balanceEnabled=Boolean(p.saldoArrotondatoAttivo);
+
+ $('roundTotalEnabled').checked=totalEnabled;
+ $('roundTotalFields').hidden=!totalEnabled;
  $('rawTotalPreview').value=S.euro(t.rawTotal);
- if(document.activeElement!==$('roundedTotalValue'))$('roundedTotalValue').value=enabled?(S.num(p.totaleArrotondato)||''):'';
+ if(document.activeElement!==$('roundedTotalValue'))$('roundedTotalValue').value=totalEnabled?(S.num(p.totaleArrotondato)||''):'';
+
+ $('roundDepositEnabled').checked=depositEnabled;
+ $('roundDepositFields').hidden=!depositEnabled;
+ $('rawDepositPreview').value=S.euro(t.rawDeposit);
+ if(document.activeElement!==$('roundedDepositValue'))$('roundedDepositValue').value=depositEnabled?(S.num(p.caparraArrotondata)||''):'';
+
+ $('roundBalanceEnabled').checked=balanceEnabled;
+ $('roundBalanceFields').hidden=!balanceEnabled;
+ $('rawBalancePreview').value=S.euro(t.rawBalance);
+ if(document.activeElement!==$('roundedBalanceValue'))$('roundedBalanceValue').value=balanceEnabled?(S.num(p.saldoArrotondato)||''):'';
+
  const cells=[['Base',t.base,''],['Manodopera',t.lab,''],['Wedding planner',t.planner,''],['Imponibile',t.taxable,''],['IVA',t.vat,'']];
  if(t.hasOverride){
   cells.push(['Totale calcolato',t.rawTotal,'grand old-grand']);
   cells.push(['Totale concordato',t.total,'grand final-grand']);
  }else cells.push(['Totale',t.rawTotal,'grand']);
- cells.push(['Caparra 30%',t.deposit,''],['Saldo 70%',t.balance,'']);
+
+ if(t.hasDepositOverride){
+  cells.push(['Caparra 30% calcolata',t.rawDeposit,'old-payment']);
+  cells.push(['Caparra concordata',t.deposit,'final-payment']);
+ }else cells.push(['Caparra 30%',t.deposit,'']);
+
+ if(t.hasBalanceOverride){
+  cells.push(['Saldo 70% calcolato',t.rawBalance,'old-payment']);
+  cells.push(['Saldo concordato',t.balance,'final-payment']);
+ }else cells.push(['Saldo 70%',t.balance,'']);
+
  $('totals').innerHTML=cells.map(([k,v,cls])=>`<div class="total-cell ${cls}"><small>${k}</small><b>${S.euro(v)}</b></div>`).join('');
- if(enabled){
+
+ if(totalEnabled){
   const rounded=S.num(p.totaleArrotondato);
   $('roundTotalPreview').innerHTML=rounded>0
-   ?`Nel PDF: <span class="old-total">${S.euro(t.rawTotal)}</span><span class="new-total">${S.euro(rounded)}</span> · Caparra 30% ${S.euro(S.round(rounded*.30))} · Saldo 70% ${S.euro(S.round(rounded*.70))}`
+   ?`Nel PDF: <span class="old-total">${S.euro(t.rawTotal)}</span><span class="new-total">${S.euro(rounded)}</span> · 30% ${S.euro(t.rawDeposit)} · 70% ${S.euro(t.rawBalance)}`
    :'Inserisci il totale finale concordato.';
  }
+ if(depositEnabled){
+  const rounded=S.num(p.caparraArrotondata);
+  $('roundDepositPreview').innerHTML=rounded>0
+   ?`Nel PDF e nel contratto: <span class="old-total">${S.euro(t.rawDeposit)}</span><span class="new-total">${S.euro(rounded)}</span>`
+   :'Inserisci la caparra concordata.';
+ }
+ if(balanceEnabled){
+  const rounded=S.num(p.saldoArrotondato);
+  $('roundBalancePreview').innerHTML=rounded>0
+   ?`Nel PDF e nel contratto: <span class="old-total">${S.euro(t.rawBalance)}</span><span class="new-total">${S.euro(rounded)}</span>`
+   :'Inserisci il saldo concordato.';
+ }
+
+ const consistency=$('paymentConsistency');
+ const anyPaymentOverride=t.hasDepositOverride||t.hasBalanceOverride;
+ consistency.hidden=!anyPaymentOverride||Math.abs(t.paymentDifference)<.005;
+ if(!consistency.hidden){
+  const sign=t.paymentDifference>0?'mancano':'eccedono';
+  consistency.innerHTML=`<b>Controllo importi:</b> caparra + saldo = ${S.euro(t.paymentSum)}. Rispetto al totale di ${S.euro(t.total)} ${sign} <strong>${S.euro(Math.abs(t.paymentDifference))}</strong>.`
+ }
+
  renderHeader()
 }
 async function handleCloudProjectUpdated(e){
