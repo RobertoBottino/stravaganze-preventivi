@@ -184,11 +184,33 @@ async function pricing(o,p,t,f,b){
   g.drawText(S.euro(t.total),{x:380,y:y-4,size:16,font:b,color:dark});
   y-=44;
  }
- g.drawText('Caparra 30%: '+S.euro(t.deposit)+' · Saldo 70%: '+S.euro(t.balance),{x:55,y,size:11.5,font:f,color:dark});
+ const paymentOldColor=rgb(.45,.48,.42);
+ const drawStruck=(label,value)=>{
+  const text=label+': '+S.euro(value),size=11.2;
+  g.drawText(text,{x:55,y,size,font:f,color:paymentOldColor});
+  g.drawLine({start:{x:54,y:y+4.7},end:{x:55+f.widthOfTextAtSize(text,size)+2,y:y+4.7},thickness:1,color:paymentOldColor});
+  y-=20
+ };
+ if(t.hasDepositOverride){
+  drawStruck('Caparra 30% calcolata',t.rawDeposit);
+  g.drawText('Caparra concordata: '+S.euro(t.deposit),{x:55,y,size:11.5,font:b,color:dark});
+  y-=22
+ }else{
+  g.drawText('Caparra 30%: '+S.euro(t.deposit),{x:55,y,size:11.5,font:f,color:dark});
+  y-=22
+ }
+ if(t.hasBalanceOverride){
+  drawStruck('Saldo 70% calcolato',t.rawBalance);
+  g.drawText('Saldo concordato: '+S.euro(t.balance),{x:55,y,size:11.5,font:b,color:dark});
+  y-=22
+ }else{
+  g.drawText('Saldo 70%: '+S.euro(t.balance),{x:55,y,size:11.5,font:f,color:dark});
+  y-=22
+ }
 
  const bonusItems=(p.preventivo.bonusItems||[]).filter(x=>String(x.descrizione||'').trim()||S.num(x.valore)>0);
  if(!bonusItems.length)return;
- y-=34;
+ y-=12;
  const bonusTitle=continued=>{
   if(y<105)openPage('BONUS / OMAGGI');
   g.drawText(continued?'BONUS / OMAGGI · CONTINUA':'BONUS / OMAGGI',{x:55,y,size:12,font:b,color:sage});
