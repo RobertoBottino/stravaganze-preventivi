@@ -11,7 +11,8 @@ const state={
   timers:new Map(),
   remoteMap:new Map(),
   remoteFetchedAt:0,
-  conflicts:new Map()
+  conflicts:new Map(),
+  opQueue:Promise.resolve()
 };
 
 S.DriveSync={
@@ -19,7 +20,7 @@ S.DriveSync={
   set suppress(v){state.suppress=Boolean(v)},
   queueProject,
   queueDelete,
-  syncAll,
+  syncAll:opts=>serialized(()=>syncAll(opts||{})),
   syncNow:()=>ensureConnectedAndSync(true),
   getArchiveInfo,
   status:()=>({syncing:state.syncing,conflicts:state.conflicts.size,connected:Boolean(S.GoogleAuth?.hasToken?.())})
@@ -36,11 +37,11 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 window.addEventListener('sf-google-auth',e=>{
   updateStatus();
-  if(e.detail?.connected)syncAll({interactive:false,reason:'login'}).catch(err=>showError(err,false))
+  if(e.detail?.connected)serialized(()=>syncAll({interactive:false,reason:'login'})).catch(err=>showError(err,false))
 });
 
 window.addEventListener('online',()=>{
-  if(S.GoogleAuth?.hasToken?.())syncAll({interactive:false,reason:'online'}).catch(err=>showError(err,false))
+  if(S.GoogleAuth?.hasToken?.())serialized(()=>syncAll({interactive:false,reason:'online'})).catch(err=>showError(err,false))
 });
 
 async function ensureConnectedAndSync(interactive){
@@ -49,7 +50,7 @@ async function ensureConnectedAndSync(interactive){
       setStatus('auth');
       await S.GoogleAuth?.connect?.(true);
     }
-    await syncAll({interactive:Boolean(interactive),reason:'manual'})
+    await serialized(()=>syncAll({interactive:Boolean(interactive),reason:'manual'}))
   }catch(e){showError(e,interactive)}
 }
 
@@ -73,6 +74,16 @@ function deviceLabel(){
   if(/Win/i.test(platform)||/Windows/i.test(ua))return'Windows';
   if(/Mac/i.test(platform)||/Macintosh/i.test(ua))return'Mac';
   return'Web'
+}
+function deviceId(){
+  let id=localStorage.getItem('sf-drive-device-id');
+  if(!id){id=crypto.randomUUID();localStorage.setItem('sf-drive-device-id',id)}
+  return id
+}
+function serialized(fn){
+  const run=state.opQueue.then(fn,fn);
+  state.opQueue=run.catch(()=>{});
+  return run
 }
 
 async function driveFetch(url,opts={}){
@@ -146,7 +157,7 @@ async function uploadProject(p,file){
   const metadata={
     name:safeName(p),
     mimeType:MIME,
-    appProperties:{sfType:'project',projectId:String(p.id),updatedAt:String(updatedAt),status:String(p.status||'bozza'),device:deviceLabel()}
+    appProperties:{sfType:'project',projectId:String(p.id),updatedAt:String(updatedAt),status:String(p.status||'bozza'),device:deviceLabel(),deviceId:deviceId()}
   };
   let result;
   if(file?.id){
@@ -184,7 +195,7 @@ function queueProject(projectOrId){
     if(!S.GoogleAuth?.hasToken?.()){setStatus('pending');return}
     try{
       const p=await S.get(S.PROJECTS,id);if(!p)return;
-      await pushOne(S.migrateProject(p),false)
+      await serialized(()=>pushOne(S.migrateProject(p),false))
     }catch(e){showError(e,false)}
   },1800))
 }
@@ -229,6 +240,20 @@ async function putRemoteLocally(p,remoteUpdatedAt,fileId,cfg){
   window.dispatchEvent(new CustomEvent('sf-drive-project-updated',{detail:{id:p.id,source:'cloud'}}))
 }
 
+function remoteLooksLikeOlderSameDevice(file,localU,base){
+  const remoteU=file?.appProperties?.updatedAt||file?.modifiedTime||'';
+  const rid=file?.appProperties?.deviceId||'';
+  if(rid&&rid===deviceId())return isoMs(localU)>=isoMs(remoteU);
+  // Compatibility with files uploaded before deviceId existed: only trust this
+  // when the last sync was from the same device label and local is newer.
+  return !rid&&file?.appProperties?.device===deviceLabel()&&isoMs(localU)>isoMs(remoteU)&&isoMs(remoteU)>=isoMs(base)
+}
+function remoteLooksLikeNewerSameDevice(file,localU){
+  const remoteU=file?.appProperties?.updatedAt||file?.modifiedTime||'';
+  const rid=file?.appProperties?.deviceId||'';
+  return Boolean(rid&&rid===deviceId()&&isoMs(remoteU)>isoMs(localU))
+}
+
 async function pushOne(p,forceLocal){
   if(!S.GoogleAuth?.hasToken?.()){setStatus('pending');return}
   setStatus('syncing');
@@ -239,9 +264,20 @@ async function pushOne(p,forceLocal){
   const base=syncMeta?.lastSyncedUpdatedAt||'';
 
   if(file&&base&&!forceLocal&&!sameVersion(remoteU,base)&&!sameVersion(localU,base)){
-    state.conflicts.set(p.id,{local:p,remote:file});
-    setStatus('conflict');
-    return
+    if(remoteLooksLikeOlderSameDevice(file,localU,base)){
+      // A previous upload from this same installation raced with a newer local save.
+      // The local copy is simply the next version, not a real conflict.
+    }else if(remoteLooksLikeNewerSameDevice(file,localU)){
+      const cloud=await downloadProject(file);
+      await putRemoteLocally(cloud,remoteU,file.id,cfg);
+      state.conflicts.delete(p.id);
+      setStatus('synced');
+      return
+    }else{
+      state.conflicts.set(p.id,{local:p,remote:file});
+      setStatus('conflict');
+      return
+    }
   }
   const saved=await uploadProject(p,file);
   cfg.projects=cfg.projects||{};
@@ -307,6 +343,16 @@ async function syncAll({interactive=false,reason='manual'}={}){
       if(base){
         const localChanged=!sameVersion(localU,base),remoteChanged=!sameVersion(remoteU,base);
         if(localChanged&&remoteChanged&&!sameVersion(localU,remoteU)){
+          if(remoteLooksLikeOlderSameDevice(file,localU,base)){
+            const saved=await uploadProject(local,file);
+            cfg.projects[id]={fileId:saved.id,lastSyncedUpdatedAt:localU,lastSyncedAt:new Date().toISOString(),lastSyncedDevice:deviceLabel()};
+            state.conflicts.delete(id);changed=true;continue
+          }
+          if(remoteLooksLikeNewerSameDevice(file,localU)){
+            const cloud=await downloadProject(file);
+            await putRemoteLocally(cloud,remoteU,file.id,cfg);
+            state.conflicts.delete(id);changed=true;continue
+          }
           const result=await resolveConflict(id,local,file,cfg,interactive);
           changed=changed||result!=='conflict';
           continue
@@ -366,8 +412,11 @@ async function getArchiveInfo(force=false){
     else if(file){
       if(base){
         const localChanged=!sameVersion(localU,base),remoteChanged=!sameVersion(remoteU,base);
-        if(localChanged&&remoteChanged&&!sameVersion(localU,remoteU))cloudStatus='conflict';
-        else if(remoteChanged&&!localChanged)cloudStatus='cloud-newer';
+        if(localChanged&&remoteChanged&&!sameVersion(localU,remoteU)){
+          if(remoteLooksLikeOlderSameDevice(file,localU,base))cloudStatus='pending';
+          else if(remoteLooksLikeNewerSameDevice(file,localU))cloudStatus='cloud-newer';
+          else cloudStatus='conflict'
+        }else if(remoteChanged&&!localChanged)cloudStatus='cloud-newer';
         else if(localChanged&&!remoteChanged)cloudStatus='pending';
         else cloudStatus='synced';
       }else{
