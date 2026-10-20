@@ -59,132 +59,111 @@ async function drawProposalImage(o,p,im,x,rowTop,maxW,maxH,f){
  const cap=captionLayout(f,im,maxW);
  let bottom=imageBottom;
  if(cap.caption){
-  const cx=x+maxW/2;let cy=imageBottom-15;
+  const cx=x+maxW/2;let cy=imageBottom-8;
   for(const ln of cap.lines){
    const tw=f.widthOfTextAtSize(ln,cap.size);
    p.drawText(ln,{x:cx-tw/2,y:cy,size:cap.size,font:f,color:dark});
    cy-=cap.lineH
   }
-  bottom=cy+4
+  bottom=cy+3
  }
  return bottom
 }
 function proposalBottomReserve(noteLines,lineH){
- // Le note possono scendere molto più vicino al fondo pagina: lo spazio centrale va alle foto.
- if(!noteLines)return 38;
- return Math.min(148,34+Math.min(noteLines,8)*lineH)
+ if(!noteLines)return 34;
+ // Riserva solo il necessario: con poco testo il valore visivo va alle fotografie.
+ return Math.min(128,22+Math.min(noteLines,8)*lineH)
 }
 function imageRowsForCount(n){
  if(n<=0)return[];
  if(n===1)return[[0]];
  if(n===2)return[[0],[1]];
- // Con 3 foto la prima diventa "hero", le altre due riempiono la seconda riga.
  if(n===3)return[[0],[1,2]];
  const rows=[];for(let i=0;i<n;i+=2)rows.push([i,...(i+1<n?[i+1]:[])]);
  return rows
 }
 function targetImageBox(chunkLength,rowIndex,rowCount,availableW,availableH,captionH){
- const gap=12;
+ const gap=10;
  const twoColW=(availableW-gap)/2;
 
  if(chunkLength===1){
-  return{
-   w:Math.min(566,availableW),
-   h:Math.min(505,Math.max(360,availableH-captionH-4))
-  }
+  return{w:Math.min(570,availableW),h:Math.min(535,Math.max(385,availableH-captionH))}
  }
 
  if(chunkLength===2){
-  // Due immagini: quasi tutta l'altezza utile viene divisa tra le due foto.
-  const eachH=Math.max(250,(availableH-(captionH*2)-12)/2);
-  return{
-   w:Math.min(548,availableW),
-   h:Math.min(315,eachH)
-  }
+  const eachH=Math.max(285,(availableH-(captionH*2)-6)/2);
+  return{w:Math.min(560,availableW),h:Math.min(340,eachH)}
  }
 
  if(chunkLength===3&&rowIndex===0){
-  // Prima immagine grande e centrale.
-  return{
-   w:Math.min(520,availableW),
-   h:Math.min(285,Math.max(235,availableH*.49-captionH))
-  }
+  return{w:Math.min(545,availableW),h:Math.min(325,Math.max(285,availableH*.55-captionH))}
  }
  if(chunkLength===3&&rowIndex===1){
-  // Due immagini ampie sotto.
-  return{
-   w:twoColW,
-   h:Math.min(250,Math.max(195,availableH*.40-captionH))
-  }
+  return{w:twoColW,h:Math.min(270,Math.max(225,availableH*.45-captionH))}
  }
 
  if(chunkLength===4){
-  return{
-   w:twoColW,
-   h:Math.min(250,Math.max(185,(availableH-captionH-12)/2))
-  }
+  return{w:twoColW,h:Math.min(270,Math.max(200,(availableH-captionH-8)/2))}
  }
 
- return{
-  w:twoColW,
-  h:Math.min(190,Math.max(125,(availableH-captionH-(rowCount-1)*14)/Math.max(1,rowCount)))
- }
+ return{w:twoColW,h:Math.min(195,Math.max(130,(availableH-captionH-(rowCount-1)*10)/Math.max(1,rowCount)))}
+}
+function proposalCaptionFootprint(f,im,width){
+ const cap=captionLayout(f,im,width);
+ return cap.caption?8+cap.lines.length*cap.lineH:0
 }
 async function drawAdaptiveProposalImages(o,p,chunk,currentY,bottomY,f){
  if(!chunk.length)return currentY;
 
- const margin=18;
- const gap=12;
+ const margin=14;
+ const gap=10;
  const availableW=W-margin*2;
  const rows=imageRowsForCount(chunk.length);
- const totalAvailable=Math.max(220,currentY-bottomY);
+ const totalAvailable=Math.max(230,currentY-bottomY);
  let cursor=currentY;
 
  for(let rowIndex=0;rowIndex<rows.length;rowIndex++){
   const ids=rows[rowIndex];
   const rowItems=ids.map(i=>chunk[i]);
   const single=ids.length===1;
-  const remainingRows=rows.length-rowIndex;
-  const remainingHeight=Math.max(170,cursor-bottomY);
-  const rowShare=remainingHeight/remainingRows;
+  const remainingHeight=Math.max(175,cursor-bottomY);
 
   const probeW=single
-   ?(chunk.length===1
-     ?Math.min(566,availableW)
-     :chunk.length===3
-      ?Math.min(520,availableW)
-      :Math.min(548,availableW))
+   ?(chunk.length===1?Math.min(570,availableW):chunk.length===3?Math.min(545,availableW):Math.min(560,availableW))
    :(availableW-gap)/2;
 
-  const captionH=Math.max(0,...rowItems.map(im=>captionLayout(f,im,probeW).height));
+  const captionH=Math.max(0,...rowItems.map(im=>proposalCaptionFootprint(f,im,probeW)));
   const box=targetImageBox(chunk.length,rowIndex,rows.length,availableW,totalAvailable,captionH);
   const boxW=single?box.w:Math.min(box.w,(availableW-gap)/2);
 
+  let targetShare;
+  if(chunk.length===3){
+   targetShare=rowIndex===0?totalAvailable*.55:totalAvailable*.45
+  }else{
+   const remainingRows=rows.length-rowIndex;
+   targetShare=remainingHeight/remainingRows
+  }
+
   const minH=
-   chunk.length===1?300:
-   chunk.length===2?230:
-   chunk.length===3?180:
-   125;
+   chunk.length===1?340:
+   chunk.length===2?275:
+   chunk.length===3&&rowIndex===0?265:
+   chunk.length===3?205:
+   135;
 
   const boxH=Math.min(
    box.h,
-   Math.max(minH,rowShare-captionH-(chunk.length<=3?2:7))
+   Math.max(minH,targetShare-captionH-(chunk.length<=3?1:5))
   );
 
   let rowBottom=Infinity;
   for(let col=0;col<rowItems.length;col++){
-   const x=single
-    ?(W-boxW)/2
-    :margin+col*(boxW+gap);
-
-   // drawProposalImage usa Math.min tra larghezza e altezza:
-   // mantiene SEMPRE esattamente le proporzioni/crop salvati dall'utente.
+   const x=single?(W-boxW)/2:margin+col*(boxW+gap);
    const bottom=await drawProposalImage(o,p,rowItems[col],x,cursor,boxW,boxH,f);
    rowBottom=Math.min(rowBottom,bottom)
   }
 
-  const rowGap=chunk.length<=3?8:11;
-  cursor=rowBottom-rowGap
+  cursor=rowBottom-(chunk.length<=3?4:8)
  }
 
  return cursor
@@ -199,9 +178,9 @@ async function proposal(o,m,f,b){
   const p=page(o),chunk=chunks[pageIndex],introPage=pageIndex===0&&intro,isLastChunk=pageIndex===chunks.length-1;
   center(p,(m.sezione||'LA NOSTRA PROPOSTA PER VOI').toUpperCase(),H-35,13,b);
   if(m.titolo)center(p,m.titolo.toUpperCase(),750,15,b);
-  let currentY=716;
+  let currentY=728;
   if(introPage){
-   currentY=722;
+   currentY=730;
    for(const ln of il.lines){
     if(ln){
      const tw=f.widthOfTextAtSize(ln,il.size);
@@ -209,16 +188,16 @@ async function proposal(o,m,f,b){
     }
     currentY-=il.lineH
    }
-   currentY-=14
+   currentY-=8
   }
 
   const noteReserve=isLastChunk?proposalBottomReserve(nl.lines.length,nl.lineH):50;
-  const bottomY=Math.max(60,noteReserve);
+  const bottomY=Math.max(48,noteReserve);
   if(chunk.length)currentY=await drawAdaptiveProposalImages(o,p,chunk,currentY,bottomY,f);
 
   if(isLastChunk&&notePos<nl.lines.length){
-   const startY=Math.min(currentY-2,images.length?currentY-2:Math.max(690,currentY));
-   const r=drawCenteredBlock(p,nl.lines.slice(notePos),startY,nl.size,f,dark,nl.lineH,56);
+   const startY=Math.min(currentY-1,images.length?currentY-1:Math.max(700,currentY));
+   const r=drawCenteredBlock(p,nl.lines.slice(notePos),startY,nl.size,f,dark,nl.lineH,48);
    notePos+=r.used
   }
  }
