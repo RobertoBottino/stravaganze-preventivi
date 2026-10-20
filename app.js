@@ -125,14 +125,14 @@ function movePage(id,d){const i=state.pagine.findIndex(x=>x.id===id),j=i+d;if(i<
 function pricingRowBreakdown(v){return S.pricingRowBreakdown(state,v)}
 function updatePricingRow(tr,v){
  const r=pricingRowBreakdown(v);
- const base=tr.querySelector('[data-price-base]'),labor=tr.querySelector('[data-price-labor]'),vat=tr.querySelector('[data-price-vat]'),total=tr.querySelector('[data-price-total]');
+ const base=tr.querySelector('[data-price-base]'),labor=tr.querySelector('[data-price-labor]'),planner=tr.querySelector('[data-price-planner]'),vat=tr.querySelector('[data-price-vat]'),total=tr.querySelector('[data-price-total]');
  if(base)base.textContent=S.euro(r.base);
  if(labor)labor.textContent=S.euro(r.lab);
+ if(planner)planner.textContent=S.euro(r.planner);
  if(vat)vat.textContent=S.euro(r.vat);
  if(total){
   const roundedNote=r.total!==r.calculatedTotal?`<small class="commercial-rounding">arrotondato da ${S.euro(r.calculatedTotal)}</small>`:'';
-  const plannerNote=r.planner>0?`<small>incl. WP ${S.euro(r.planner)}</small>`:'';
-  total.innerHTML=`<strong>${S.euro(r.total)}</strong>${roundedNote}${plannerNote}`
+  total.innerHTML=`<strong>${S.euro(r.total)}</strong>${roundedNote}`
  }
 }
 function renderPricing(){
@@ -145,8 +145,9 @@ function renderPricing(){
    <td class="pricing-unit"><input data-r="prezzoUnitario" type="number" min="0" step="0.01" value="${v.prezzoUnitario}"></td>
    <td class="row-money row-base" data-price-base>${S.euro(r.base)}</td>
    <td class="row-money row-labor" data-price-labor>${S.euro(r.lab)}</td>
+   <td class="row-money row-planner" data-price-planner>${S.euro(r.planner)}</td>
    <td class="row-money row-vat" data-price-vat>${S.euro(r.vat)}</td>
-   <td class="row-money row-grand-total" data-price-total><strong>${S.euro(r.total)}</strong>${r.total!==r.calculatedTotal?`<small class="commercial-rounding">arrotondato da ${S.euro(r.calculatedTotal)}</small>`:''}${r.planner>0?`<small>incl. WP ${S.euro(r.planner)}</small>`:''}</td>
+   <td class="row-money row-grand-total" data-price-total><strong>${S.euro(r.total)}</strong>${r.total!==r.calculatedTotal?`<small class="commercial-rounding">arrotondato da ${S.euro(r.calculatedTotal)}</small>`:''}</td>
    <td class="pricing-actions"><button class="danger" data-del>×</button></td>
   </tr>`
  }).join('');
