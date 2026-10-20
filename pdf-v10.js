@@ -69,10 +69,16 @@ async function drawProposalImage(o,p,im,x,rowTop,maxW,maxH,f){
  }
  return bottom
 }
-function proposalBottomReserve(noteLines,lineH){
- if(!noteLines)return 34;
- // Riserva solo il necessario: con poco testo il valore visivo va alle fotografie.
- return Math.min(128,22+Math.min(noteLines,8)*lineH)
+const PROPOSAL_BOTTOM_MARGIN=48;
+const PROPOSAL_NOTE_GAP=20;
+const PROPOSAL_ROW_GAP=10;
+function proposalNoteMetrics(noteLines,lineH){
+ if(!noteLines)return{minY:PROPOSAL_BOTTOM_MARGIN,topY:PROPOSAL_BOTTOM_MARGIN,imageBottomY:PROPOSAL_BOTTOM_MARGIN};
+ const minY=PROPOSAL_BOTTOM_MARGIN;
+ const topY=minY+Math.max(0,noteLines-1)*lineH;
+ // L'area immagini termina qui: in questo modo il testo resta sempre sulla stessa
+ // pagina (quando fisicamente possibile) e non rimane incollato alle fotografie.
+ return{minY,topY,imageBottomY:topY+PROPOSAL_NOTE_GAP}
 }
 function imageRowsForCount(n){
  if(n<=0)return[];
@@ -119,14 +125,15 @@ async function drawAdaptiveProposalImages(o,p,chunk,currentY,bottomY,f){
  const gap=10;
  const availableW=W-margin*2;
  const rows=imageRowsForCount(chunk.length);
- const totalAvailable=Math.max(230,currentY-bottomY);
+ const totalAvailable=Math.max(120,currentY-bottomY);
  let cursor=currentY;
 
  for(let rowIndex=0;rowIndex<rows.length;rowIndex++){
   const ids=rows[rowIndex];
   const rowItems=ids.map(i=>chunk[i]);
   const single=ids.length===1;
-  const remainingHeight=Math.max(175,cursor-bottomY);
+  const remainingRows=rows.length-rowIndex;
+  const remainingHeight=Math.max(90,cursor-bottomY);
 
   const probeW=single
    ?(chunk.length===1?Math.min(570,availableW):chunk.length===3?Math.min(545,availableW):Math.min(560,availableW))
@@ -136,25 +143,20 @@ async function drawAdaptiveProposalImages(o,p,chunk,currentY,bottomY,f){
   const box=targetImageBox(chunk.length,rowIndex,rows.length,availableW,totalAvailable,captionH);
   const boxW=single?box.w:Math.min(box.w,(availableW-gap)/2);
 
-  let targetShare;
+  // Ogni riga riceve solo lo spazio realmente disponibile. Prima usavamo
+  // altezze minime rigide: con 2/3 immagini spingevano le ultime righe e le
+  // note fuori pagina. Ora le foto si riducono quel tanto che basta.
+  let rowShare;
   if(chunk.length===3){
-   targetShare=rowIndex===0?totalAvailable*.55:totalAvailable*.45
+   const preferred= rowIndex===0 ? totalAvailable*.55 : totalAvailable*.45;
+   rowShare=Math.min(preferred,remainingHeight-(remainingRows-1)*90);
   }else{
-   const remainingRows=rows.length-rowIndex;
-   targetShare=remainingHeight/remainingRows
+   rowShare=(remainingHeight-PROPOSAL_ROW_GAP*Math.max(0,remainingRows-1))/remainingRows;
   }
+  rowShare=Math.max(90,rowShare);
 
-  const minH=
-   chunk.length===1?340:
-   chunk.length===2?275:
-   chunk.length===3&&rowIndex===0?265:
-   chunk.length===3?205:
-   135;
-
-  const boxH=Math.min(
-   box.h,
-   Math.max(minH,targetShare-captionH-(chunk.length<=3?1:5))
-  );
+  const maxImageH=Math.max(72,rowShare-captionH);
+  const boxH=Math.min(box.h,maxImageH);
 
   let rowBottom=Infinity;
   for(let col=0;col<rowItems.length;col++){
@@ -163,7 +165,7 @@ async function drawAdaptiveProposalImages(o,p,chunk,currentY,bottomY,f){
    rowBottom=Math.min(rowBottom,bottom)
   }
 
-  cursor=rowBottom-(chunk.length<=3?4:8)
+  cursor=rowBottom-(rowIndex<rows.length-1?PROPOSAL_ROW_GAP:0)
  }
 
  return cursor
@@ -191,13 +193,18 @@ async function proposal(o,m,f,b){
    currentY-=8
   }
 
-  const noteReserve=isLastChunk?proposalBottomReserve(nl.lines.length,nl.lineH):50;
-  const bottomY=Math.max(48,noteReserve);
+  const noteMetrics=isLastChunk?proposalNoteMetrics(nl.lines.length,nl.lineH):null;
+  const bottomY=isLastChunk&&nl.lines.length?noteMetrics.imageBottomY:48;
   if(chunk.length)currentY=await drawAdaptiveProposalImages(o,p,chunk,currentY,bottomY,f);
 
   if(isLastChunk&&notePos<nl.lines.length){
-   const startY=Math.min(currentY-1,images.length?currentY-1:Math.max(700,currentY));
-   const r=drawCenteredBlock(p,nl.lines.slice(notePos),startY,nl.size,f,dark,nl.lineH,48);
+   // Con immagini la nota viene ancorata nella zona riservata in basso:
+   // così tutte le righe restano insieme e c'è un distacco visibile dalle foto.
+   // Senza immagini manteniamo invece l'impostazione alta della pagina.
+   const startY=images.length
+    ?noteMetrics.topY
+    :Math.max(noteMetrics.topY,Math.min(705,currentY-18));
+   const r=drawCenteredBlock(p,nl.lines.slice(notePos),startY,nl.size,f,dark,nl.lineH,noteMetrics.minY-1);
    notePos+=r.used
   }
  }
