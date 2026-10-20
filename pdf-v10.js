@@ -37,11 +37,12 @@ function noteLayout(f,text){
 }
 function splitChunks(images,firstCap){if(!images.length)return[[]];const out=[],rest=images.slice();if(firstCap===0)out.push([]);else out.push(rest.splice(0,firstCap));while(rest.length)out.push(rest.splice(0,MAX_IMAGES_PER_PAGE));return out}
 function drawCenteredBlock(p,lines,start,size,font,color,lineH,minY=62){let y=start,i=0;for(;i<lines.length;i++){if(y<minY)break;const ln=lines[i];if(ln){const tw=font.widthOfTextAtSize(ln,size);p.drawText(ln,{x:(W-tw)/2,y,size,font,color})}y-=lineH}return{used:i,y}}
+const PROPOSAL_CAPTION_GAP=12;
 function captionLayout(f,im,maxW){
  const caption=String(im?.descrizione||'').trim();
  if(!caption)return{caption:'',size:11.2,lines:[],lineH:15,height:0};
  const fit=fittedLines(f,caption,11.2,9.8,maxW,7),lineH=fit.size*1.34;
- return{caption,size:fit.size,lines:fit.lines,lineH,height:17+fit.lines.length*lineH};
+ return{caption,size:fit.size,lines:fit.lines,lineH,height:PROPOSAL_CAPTION_GAP+fit.lines.length*lineH};
 }
 async function drawProposalImage(o,p,im,x,rowTop,maxW,maxH,f){
  let imageBottom=rowTop;
@@ -59,7 +60,7 @@ async function drawProposalImage(o,p,im,x,rowTop,maxW,maxH,f){
  const cap=captionLayout(f,im,maxW);
  let bottom=imageBottom;
  if(cap.caption){
-  const cx=x+maxW/2;let cy=imageBottom-8;
+  const cx=x+maxW/2;let cy=imageBottom-PROPOSAL_CAPTION_GAP;
   for(const ln of cap.lines){
    const tw=f.widthOfTextAtSize(ln,cap.size);
    p.drawText(ln,{x:cx-tw/2,y:cy,size:cap.size,font:f,color:dark});
@@ -116,7 +117,7 @@ function targetImageBox(chunkLength,rowIndex,rowCount,availableW,availableH,capt
 }
 function proposalCaptionFootprint(f,im,width){
  const cap=captionLayout(f,im,width);
- return cap.caption?8+cap.lines.length*cap.lineH:0
+ return cap.caption?PROPOSAL_CAPTION_GAP+cap.lines.length*cap.lineH:0
 }
 async function drawAdaptiveProposalImages(o,p,chunk,currentY,bottomY,f){
  if(!chunk.length)return currentY;
