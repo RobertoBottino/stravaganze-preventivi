@@ -146,7 +146,7 @@ function renderPricing(){
  body.innerHTML=state.preventivo.voci.map(v=>{
   const r=pricingRowBreakdown(v);
   return `<tr data-id="${v.id}">
-   <td class="pricing-desc-cell"><button type="button" class="price-drag" data-drag aria-label="Trascina per riordinare" title="Trascina per riordinare · frecce ↑ ↓ da tastiera">⋮⋮</button><input data-r="descrizione" value="${S.attr(v.descrizione)}" placeholder="es. Centrotavola"></td>
+   <td class="pricing-desc-cell"><div class="pricing-desc-inner"><button type="button" class="price-drag" data-drag aria-label="Trascina per riordinare" title="Trascina per riordinare · frecce ↑ ↓ da tastiera">⋮⋮</button><input data-r="descrizione" value="${S.attr(v.descrizione)}" placeholder="es. Centrotavola"></div></td>
    <td class="pricing-qty"><input data-r="quantita" type="number" min="0" step="0.1" value="${v.quantita}"></td>
    <td class="pricing-unit"><input data-r="prezzoUnitario" type="number" min="0" step="0.01" value="${v.prezzoUnitario}"></td>
    <td class="row-money row-base" data-price-base>${S.euro(r.base)}</td>
