@@ -30,7 +30,7 @@ async function registerServiceWorkerAggressive(){
   location.reload();
  });
 
- const reg=await navigator.serviceWorker.register('./sw.js?v=53',{updateViaCache:'none'});
+ const reg=await navigator.serviceWorker.register('./sw.js?v=54',{updateViaCache:'none'});
 
  const activateNow=worker=>{
   if(!worker)return;
