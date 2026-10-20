@@ -122,14 +122,21 @@ function renderProposals(){
 }
 function moveImage(p,id,d){const i=p.immagini.findIndex(x=>x.id===id),j=i+d;if(i<0||j<0||j>=p.immagini.length)return;[p.immagini[i],p.immagini[j]]=[p.immagini[j],p.immagini[i]];changed();renderProposals()}
 function movePage(id,d){const i=state.pagine.findIndex(x=>x.id===id),j=i+d;if(i<0||j<0||j>=state.pagine.length)return;[state.pagine[i],state.pagine[j]]=[state.pagine[j],state.pagine[i]];changed();renderProposals()}
+function commercialRoundUp(value){
+ const n=S.round(value);
+ if(n<=0)return 0;
+ const step=n<100?5:n<1000?10:50;
+ return S.round(Math.ceil((n-1e-9)/step)*step)
+}
 function pricingRowBreakdown(v){
  const base=S.round(S.num(v.quantita)*S.num(v.prezzoUnitario));
  const labor=S.round(base*S.num(state.preventivo.manodoperaPct)/100);
  const planner=S.round(base*S.num(state.preventivo.weddingPlannerPct)/100);
  const taxable=S.round(base+labor+planner);
  const vat=S.round(taxable*S.num(state.preventivo.ivaPct)/100);
- const total=S.round(taxable+vat);
- return{base,labor,planner,vat,total}
+ const calculatedTotal=S.round(taxable+vat);
+ const total=commercialRoundUp(calculatedTotal);
+ return{base,labor,planner,vat,calculatedTotal,total}
 }
 function updatePricingRow(tr,v){
  const r=pricingRowBreakdown(v);
@@ -138,7 +145,9 @@ function updatePricingRow(tr,v){
  if(labor)labor.textContent=S.euro(r.labor);
  if(vat)vat.textContent=S.euro(r.vat);
  if(total){
-  total.innerHTML=`<strong>${S.euro(r.total)}</strong>${r.planner>0?`<small>incl. WP ${S.euro(r.planner)}</small>`:''}`
+  const roundedNote=r.total!==r.calculatedTotal?`<small class="commercial-rounding">arrotondato da ${S.euro(r.calculatedTotal)}</small>`:'';
+  const plannerNote=r.planner>0?`<small>incl. WP ${S.euro(r.planner)}</small>`:'';
+  total.innerHTML=`<strong>${S.euro(r.total)}</strong>${roundedNote}${plannerNote}`
  }
 }
 function renderPricing(){
@@ -152,7 +161,7 @@ function renderPricing(){
    <td class="row-money row-base" data-price-base>${S.euro(r.base)}</td>
    <td class="row-money row-labor" data-price-labor>${S.euro(r.labor)}</td>
    <td class="row-money row-vat" data-price-vat>${S.euro(r.vat)}</td>
-   <td class="row-money row-grand-total" data-price-total><strong>${S.euro(r.total)}</strong>${r.planner>0?`<small>incl. WP ${S.euro(r.planner)}</small>`:''}</td>
+   <td class="row-money row-grand-total" data-price-total><strong>${S.euro(r.total)}</strong>${r.total!==r.calculatedTotal?`<small class="commercial-rounding">arrotondato da ${S.euro(r.calculatedTotal)}</small>`:''}${r.planner>0?`<small>incl. WP ${S.euro(r.planner)}</small>`:''}</td>
    <td class="pricing-actions"><button class="danger" data-del>×</button></td>
   </tr>`
  }).join('');
