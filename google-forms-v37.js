@@ -10,6 +10,7 @@ const CONFIG={
     en:{id:'1DoEekECeP1ZO20sp84ZHpqYL4Kk1f3JXu2YHkKNRMro',label:'English'}
   }
 };
+const AUTH_SESSION_KEY='sf-google-auth-session-v1';
 const state={
   accessToken:'',
   tokenExpiresAt:0,
@@ -24,9 +25,12 @@ const state={
 document.addEventListener('DOMContentLoaded',init);
 
 async function init(){
+  restoreAuthSession();
   wire();
   renderAuthState();
-  setTimeout(()=>{if(!$('googleAuthModal')?.dataset.dismissed)showAuthModal()},450);
+  setTimeout(()=>{
+    if(!hasToken()&&!$('googleAuthModal')?.dataset.dismissed)showAuthModal()
+  },450);
   try{await ensureGoogleClient()}catch(e){console.warn('Google Identity Services non disponibile',e);renderAuthState()}
 }
 
@@ -75,11 +79,40 @@ async function ensureGoogleClient(){
   return state.tokenClient;
 }
 function wait(ms){return new Promise(r=>setTimeout(r,ms))}
+function persistAuthSession(){
+  try{
+    if(!state.accessToken||!state.tokenExpiresAt){sessionStorage.removeItem(AUTH_SESSION_KEY);return}
+    sessionStorage.setItem(AUTH_SESSION_KEY,JSON.stringify({
+      accessToken:state.accessToken,
+      tokenExpiresAt:state.tokenExpiresAt
+    }))
+  }catch(e){console.warn('Impossibile conservare la sessione Google nel browser',e)}
+}
+function restoreAuthSession(){
+  try{
+    const raw=sessionStorage.getItem(AUTH_SESSION_KEY);
+    if(!raw)return false;
+    const saved=JSON.parse(raw);
+    const token=String(saved?.accessToken||'');
+    const expiresAt=Number(saved?.tokenExpiresAt||0);
+    if(!token||!Number.isFinite(expiresAt)||Date.now()>=expiresAt-30000){
+      sessionStorage.removeItem(AUTH_SESSION_KEY);
+      return false
+    }
+    state.accessToken=token;
+    state.tokenExpiresAt=expiresAt;
+    return true
+  }catch(e){
+    try{sessionStorage.removeItem(AUTH_SESSION_KEY)}catch{}
+    return false
+  }
+}
 function tokenCallback(resp){
   const pending=state.pendingAuth;state.pendingAuth=null;
   if(resp&&resp.access_token){
     state.accessToken=resp.access_token;
     state.tokenExpiresAt=Date.now()+Math.max(60,Number(resp.expires_in||3600))*1000;
+    persistAuthSession();
     renderAuthState();
     window.dispatchEvent(new CustomEvent('sf-google-auth',{detail:{connected:true,expiresAt:state.tokenExpiresAt}}));
     pending?.resolve(resp);
@@ -103,7 +136,9 @@ async function connectGoogle(selectAccount){
   });
 }
 function clearToken(){
-  state.accessToken='';state.tokenExpiresAt=0;renderAuthState();
+  state.accessToken='';state.tokenExpiresAt=0;
+  try{sessionStorage.removeItem(AUTH_SESSION_KEY)}catch{}
+  renderAuthState();
   window.dispatchEvent(new CustomEvent('sf-google-auth',{detail:{connected:false}}));
 }
 function hasToken(){return Boolean(state.accessToken&&Date.now()<state.tokenExpiresAt-30000)}
