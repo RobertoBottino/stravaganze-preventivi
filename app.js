@@ -122,27 +122,12 @@ function renderProposals(){
 }
 function moveImage(p,id,d){const i=p.immagini.findIndex(x=>x.id===id),j=i+d;if(i<0||j<0||j>=p.immagini.length)return;[p.immagini[i],p.immagini[j]]=[p.immagini[j],p.immagini[i]];changed();renderProposals()}
 function movePage(id,d){const i=state.pagine.findIndex(x=>x.id===id),j=i+d;if(i<0||j<0||j>=state.pagine.length)return;[state.pagine[i],state.pagine[j]]=[state.pagine[j],state.pagine[i]];changed();renderProposals()}
-function commercialRoundUp(value){
- const n=S.round(value);
- if(n<=0)return 0;
- const step=n<100?5:n<1000?10:50;
- return S.round(Math.ceil((n-1e-9)/step)*step)
-}
-function pricingRowBreakdown(v){
- const base=S.round(S.num(v.quantita)*S.num(v.prezzoUnitario));
- const labor=S.round(base*S.num(state.preventivo.manodoperaPct)/100);
- const planner=S.round(base*S.num(state.preventivo.weddingPlannerPct)/100);
- const taxable=S.round(base+labor+planner);
- const vat=S.round(taxable*S.num(state.preventivo.ivaPct)/100);
- const calculatedTotal=S.round(taxable+vat);
- const total=commercialRoundUp(calculatedTotal);
- return{base,labor,planner,vat,calculatedTotal,total}
-}
+function pricingRowBreakdown(v){return S.pricingRowBreakdown(state,v)}
 function updatePricingRow(tr,v){
  const r=pricingRowBreakdown(v);
  const base=tr.querySelector('[data-price-base]'),labor=tr.querySelector('[data-price-labor]'),vat=tr.querySelector('[data-price-vat]'),total=tr.querySelector('[data-price-total]');
  if(base)base.textContent=S.euro(r.base);
- if(labor)labor.textContent=S.euro(r.labor);
+ if(labor)labor.textContent=S.euro(r.lab);
  if(vat)vat.textContent=S.euro(r.vat);
  if(total){
   const roundedNote=r.total!==r.calculatedTotal?`<small class="commercial-rounding">arrotondato da ${S.euro(r.calculatedTotal)}</small>`:'';
@@ -159,7 +144,7 @@ function renderPricing(){
    <td class="pricing-qty"><input data-r="quantita" type="number" min="0" step="0.1" value="${v.quantita}"></td>
    <td class="pricing-unit"><input data-r="prezzoUnitario" type="number" min="0" step="0.01" value="${v.prezzoUnitario}"></td>
    <td class="row-money row-base" data-price-base>${S.euro(r.base)}</td>
-   <td class="row-money row-labor" data-price-labor>${S.euro(r.labor)}</td>
+   <td class="row-money row-labor" data-price-labor>${S.euro(r.lab)}</td>
    <td class="row-money row-vat" data-price-vat>${S.euro(r.vat)}</td>
    <td class="row-money row-grand-total" data-price-total><strong>${S.euro(r.total)}</strong>${r.total!==r.calculatedTotal?`<small class="commercial-rounding">arrotondato da ${S.euro(r.calculatedTotal)}</small>`:''}${r.planner>0?`<small>incl. WP ${S.euro(r.planner)}</small>`:''}</td>
    <td class="pricing-actions"><button class="danger" data-del>×</button></td>
@@ -242,11 +227,9 @@ function enablePricingDrag(body){
  })
 }
 function proposalPricingLine(v){
- const labor=S.num(state.preventivo.manodoperaPct),planner=S.num(state.preventivo.weddingPlannerPct),k=1+(labor+planner)/100;
- const q=S.num(v.quantita),unit=S.round(S.num(v.prezzoUnitario)*k),line=S.round(q*unit);
- const qty=q.toLocaleString('it-IT',{maximumFractionDigits:2});
+ const r=pricingRowBreakdown(v),q=S.num(v.quantita),qty=q.toLocaleString('it-IT',{maximumFractionDigits:2});
  const desc=String(v.descrizione||'Voce').trim()||'Voce';
- return q===1?`${desc} · ${S.euro(unit)}`:`${desc} · ${qty} × ${S.euro(unit)} = ${S.euro(line)}`
+ return q===1?`${desc} · ${S.euro(r.total)}`:`${desc} · q.tà ${qty} · ${S.euro(r.total)}`
 }
 function openPricingCopyModal(pageId){
  pricingCopyTargetId=pageId;
@@ -254,9 +237,8 @@ function openPricingCopyModal(pageId){
  $('copyPricingTarget').textContent='Pagina: '+(page.titolo||page.sezione||'Proposta');
  const rows=state.preventivo.voci||[];
  $('pricingCopyList').innerHTML=rows.length?rows.map(v=>{
-  const q=S.num(v.quantita),labor=S.num(state.preventivo.manodoperaPct),planner=S.num(state.preventivo.weddingPlannerPct),k=1+(labor+planner)/100;
-  const unit=S.round(S.num(v.prezzoUnitario)*k),line=S.round(q*unit);
-  return `<label class="pricing-copy-item"><input type="checkbox" value="${S.attr(v.id)}"><span class="pricing-copy-item-main"><b>${S.esc(v.descrizione||'Voce senza descrizione')}</b><small>Q.tà ${q.toLocaleString('it-IT',{maximumFractionDigits:2})} · ${S.euro(unit)} cad.</small></span><span class="pricing-copy-item-price">${S.euro(line)}</span></label>`
+  const q=S.num(v.quantita),r=pricingRowBreakdown(v);
+  return `<label class="pricing-copy-item"><input type="checkbox" value="${S.attr(v.id)}"><span class="pricing-copy-item-main"><b>${S.esc(v.descrizione||'Voce senza descrizione')}</b><small>Q.tà ${q.toLocaleString('it-IT',{maximumFractionDigits:2})} · totale voce IVA inclusa</small></span><span class="pricing-copy-item-price">${S.euro(r.total)}</span></label>`
  }).join(''):'<div class="pricing-copy-empty">Non ci sono ancora voci nel preventivo.</div>';
  const append=document.querySelector('input[name="pricingCopyMode"][value="append"]');if(append)append.checked=true;
  $('copyPricingModal').hidden=false;
@@ -309,7 +291,9 @@ function renderTotals(){
  $('rawBalancePreview').value=S.euro(t.rawBalance);
  if(document.activeElement!==$('roundedBalanceValue'))$('roundedBalanceValue').value=balanceEnabled?(S.num(p.saldoArrotondato)||''):'';
 
- const cells=[['Base',t.base,''],['Manodopera',t.lab,''],['Wedding planner',t.planner,''],['Imponibile',t.taxable,''],['IVA',t.vat,'']];
+ const cells=[['Base',t.base,''],['Manodopera',t.lab,''],['Wedding planner',t.planner,'']];
+ if(t.roundingNet>0)cells.push(['Arrotondamenti commerciali',t.roundingNet,'']);
+ cells.push(['Imponibile',t.taxable,''],['IVA',t.vat,'']);
  if(t.hasOverride){
   cells.push(['Totale calcolato',t.rawTotal,'grand old-grand']);
   cells.push(['Totale finale',t.total,'grand final-grand']);
