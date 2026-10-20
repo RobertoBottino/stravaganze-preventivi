@@ -20,13 +20,43 @@ S.get=async(store,id)=>{const db=await S.openDb();return new Promise((ok,ko)=>{c
 S.del=async(store,id)=>{const db=await S.openDb();await new Promise((ok,ko)=>{const tx=db.transaction(store,'readwrite');tx.objectStore(store).delete(id);tx.oncomplete=()=>{db.close();ok()};tx.onerror=()=>ko(tx.error)});if(store===S.PROJECTS&&!S.DriveSync?.suppress)queueMicrotask(()=>S.DriveSync?.queueDelete?.(id))};
 S.all=async store=>{const db=await S.openDb();return new Promise((ok,ko)=>{const tx=db.transaction(store),r=tx.objectStore(store).getAll();r.onsuccess=()=>{db.close();ok(r.result||[])};r.onerror=()=>ko(r.error)})};
 
-S.calc=p=>{
-  const base=S.round((p.preventivo.voci||[]).reduce((a,v)=>a+S.num(v.quantita)*S.num(v.prezzoUnitario),0));
+S.commercialRoundUp=value=>{
+  const n=S.round(value);
+  if(n<=0)return 0;
+  const step=n<100?5:n<1000?10:50;
+  return S.round(Math.ceil((n-1e-9)/step)*step);
+};
+
+S.pricingRowBreakdown=(p,v)=>{
+  const base=S.round(S.num(v.quantita)*S.num(v.prezzoUnitario));
   const lab=S.round(base*S.num(p.preventivo.manodoperaPct)/100);
   const planner=S.round(base*S.num(p.preventivo.weddingPlannerPct)/100);
-  const taxable=S.round(base+lab+planner);
-  const vat=S.round(taxable*S.num(p.preventivo.ivaPct)/100);
-  const rawTotal=S.round(taxable+vat);
+  const calculatedTaxable=S.round(base+lab+planner);
+  const calculatedVat=S.round(calculatedTaxable*S.num(p.preventivo.ivaPct)/100);
+  const calculatedTotal=S.round(calculatedTaxable+calculatedVat);
+  const total=S.commercialRoundUp(calculatedTotal);
+  const vatRate=S.num(p.preventivo.ivaPct);
+  const vat=vatRate>0?S.round(total*vatRate/(100+vatRate)):0;
+  const taxable=S.round(total-vat);
+  const roundingGross=S.round(total-calculatedTotal);
+  const roundingNet=S.round(taxable-calculatedTaxable);
+  return{base,lab,planner,calculatedTaxable,calculatedVat,calculatedTotal,taxable,vat,total,roundingGross,roundingNet};
+};
+
+S.calc=p=>{
+  const rows=(p.preventivo.voci||[]).map(v=>S.pricingRowBreakdown(p,v));
+  const sum=k=>S.round(rows.reduce((a,r)=>a+S.num(r[k]),0));
+  const base=sum('base');
+  const lab=sum('lab');
+  const planner=sum('planner');
+  const calculatedTaxable=sum('calculatedTaxable');
+  const calculatedVat=sum('calculatedVat');
+  const calculatedTotal=sum('calculatedTotal');
+  const taxable=sum('taxable');
+  const vat=sum('vat');
+  const roundingGross=sum('roundingGross');
+  const roundingNet=sum('roundingNet');
+  const rawTotal=sum('total');
 
   // Il totale manuale cambia solo il totale finale: le singole voci restano intatte.
   const totalOverrideEnabled=Boolean(p.preventivo.totaleArrotondatoAttivo);
@@ -34,7 +64,7 @@ S.calc=p=>{
   const hasDirectTotalOverride=totalOverrideEnabled&&totalOverrideValue>0&&totalOverrideValue!==rawTotal;
   const quoteTotal=hasDirectTotalOverride?totalOverrideValue:rawTotal;
 
-  // Il 30/70 di riferimento viene calcolato sul totale prima degli arrotondamenti dei pagamenti.
+  // Il 30/70 di riferimento viene calcolato sul totale commerciale delle righe.
   const rawDeposit=S.round(quoteTotal*.30);
   const depositOverrideEnabled=Boolean(p.preventivo.caparraArrotondataAttiva);
   const depositOverrideValue=S.round(p.preventivo.caparraArrotondata);
@@ -48,7 +78,6 @@ S.calc=p=>{
   const balance=hasBalanceOverride?balanceOverrideValue:rawBalance;
 
   // Se si arrotonda caparra e/o saldo, il totale finale diventa la loro somma.
-  // Non vengono ricalcolati prezzi, imponibile o IVA.
   const hasPaymentOverride=hasDepositOverride||hasBalanceOverride;
   const paymentSum=S.round(deposit+balance);
   const total=hasPaymentOverride?paymentSum:quoteTotal;
@@ -56,7 +85,9 @@ S.calc=p=>{
   const hasOverride=total!==rawTotal;
 
   return{
-    base,lab,planner,taxable,vat,
+    rows,base,lab,planner,
+    calculatedTaxable,calculatedVat,calculatedTotal,
+    taxable,vat,roundingGross,roundingNet,
     rawTotal,quoteTotal,total,hasOverride,hasDirectTotalOverride,
     rawDeposit,deposit,hasDepositOverride,
     rawBalance,balance,hasBalanceOverride,
