@@ -70,9 +70,9 @@ function wire(){
  $('installBtn').onclick=install;$('closeInstall').onclick=()=>$('installModal').hidden=true;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e});
  $('addProposalBtn').onclick=()=>{state.pagine.push({id:S.uuid(),sezione:'LA NOSTRA PROPOSTA PER VOI',titolo:'',testoIntro:'',prezzoTesto:'',immagini:[]});changed();renderProposals()};
  $('addRowBtn').onclick=()=>{state.preventivo.voci.push({id:S.uuid(),descrizione:'',quantita:1,prezzoUnitario:0});changed();renderPricing();renderTotals()};
- $('laborPct').oninput=e=>{state.preventivo.manodoperaPct=S.num(e.target.value);changed();renderTotals()};
- $('plannerPct').oninput=e=>{state.preventivo.weddingPlannerPct=S.num(e.target.value);changed();renderTotals()};
- $('vatPct').oninput=e=>{state.preventivo.ivaPct=S.num(e.target.value);changed();renderTotals()};
+ $('laborPct').oninput=e=>{state.preventivo.manodoperaPct=S.num(e.target.value);changed();renderPricing();renderTotals()};
+ $('plannerPct').oninput=e=>{state.preventivo.weddingPlannerPct=S.num(e.target.value);changed();renderPricing();renderTotals()};
+ $('vatPct').oninput=e=>{state.preventivo.ivaPct=S.num(e.target.value);changed();renderPricing();renderTotals()};
  $('roundTotalEnabled').onchange=e=>{
   state.preventivo.totaleArrotondatoAttivo=e.target.checked;
   if(e.target.checked&&S.num(state.preventivo.totaleArrotondato)<=0)state.preventivo.totaleArrotondato=S.calc({...state,preventivo:{...state.preventivo,totaleArrotondatoAttivo:false}}).rawTotal;
@@ -122,14 +122,45 @@ function renderProposals(){
 }
 function moveImage(p,id,d){const i=p.immagini.findIndex(x=>x.id===id),j=i+d;if(i<0||j<0||j>=p.immagini.length)return;[p.immagini[i],p.immagini[j]]=[p.immagini[j],p.immagini[i]];changed();renderProposals()}
 function movePage(id,d){const i=state.pagine.findIndex(x=>x.id===id),j=i+d;if(i<0||j<0||j>=state.pagine.length)return;[state.pagine[i],state.pagine[j]]=[state.pagine[j],state.pagine[i]];changed();renderProposals()}
+function pricingRowBreakdown(v){
+ const base=S.round(S.num(v.quantita)*S.num(v.prezzoUnitario));
+ const labor=S.round(base*S.num(state.preventivo.manodoperaPct)/100);
+ const planner=S.round(base*S.num(state.preventivo.weddingPlannerPct)/100);
+ const taxable=S.round(base+labor+planner);
+ const vat=S.round(taxable*S.num(state.preventivo.ivaPct)/100);
+ const total=S.round(taxable+vat);
+ return{base,labor,planner,vat,total}
+}
+function updatePricingRow(tr,v){
+ const r=pricingRowBreakdown(v);
+ const base=tr.querySelector('[data-price-base]'),labor=tr.querySelector('[data-price-labor]'),vat=tr.querySelector('[data-price-vat]'),total=tr.querySelector('[data-price-total]');
+ if(base)base.textContent=S.euro(r.base);
+ if(labor)labor.textContent=S.euro(r.labor);
+ if(vat)vat.textContent=S.euro(r.vat);
+ if(total){
+  total.innerHTML=`<strong>${S.euro(r.total)}</strong>${r.planner>0?`<small>incl. WP ${S.euro(r.planner)}</small>`:''}`
+ }
+}
 function renderPricing(){
  const body=$('pricingRows');
- body.innerHTML=state.preventivo.voci.map(v=>`<tr data-id="${v.id}"><td class="pricing-desc-cell"><button type="button" class="price-drag" data-drag aria-label="Trascina per riordinare" title="Trascina per riordinare · frecce ↑ ↓ da tastiera">⋮⋮</button><input data-r="descrizione" value="${S.attr(v.descrizione)}" placeholder="es. Centrotavola"></td><td><input data-r="quantita" type="number" min="0" step="0.1" value="${v.quantita}"></td><td><input data-r="prezzoUnitario" type="number" min="0" step="0.01" value="${v.prezzoUnitario}"></td><td class="row-total">${S.euro(S.num(v.quantita)*S.num(v.prezzoUnitario))}</td><td><button class="danger" data-del>×</button></td></tr>`).join('');
+ body.innerHTML=state.preventivo.voci.map(v=>{
+  const r=pricingRowBreakdown(v);
+  return `<tr data-id="${v.id}">
+   <td class="pricing-desc-cell"><button type="button" class="price-drag" data-drag aria-label="Trascina per riordinare" title="Trascina per riordinare · frecce ↑ ↓ da tastiera">⋮⋮</button><input data-r="descrizione" value="${S.attr(v.descrizione)}" placeholder="es. Centrotavola"></td>
+   <td class="pricing-qty"><input data-r="quantita" type="number" min="0" step="0.1" value="${v.quantita}"></td>
+   <td class="pricing-unit"><input data-r="prezzoUnitario" type="number" min="0" step="0.01" value="${v.prezzoUnitario}"></td>
+   <td class="row-money row-base" data-price-base>${S.euro(r.base)}</td>
+   <td class="row-money row-labor" data-price-labor>${S.euro(r.labor)}</td>
+   <td class="row-money row-vat" data-price-vat>${S.euro(r.vat)}</td>
+   <td class="row-money row-grand-total" data-price-total><strong>${S.euro(r.total)}</strong>${r.planner>0?`<small>incl. WP ${S.euro(r.planner)}</small>`:''}</td>
+   <td class="pricing-actions"><button class="danger" data-del>×</button></td>
+  </tr>`
+ }).join('');
  body.querySelectorAll('tr').forEach(tr=>{
   const v=state.preventivo.voci.find(x=>x.id===tr.dataset.id);
   tr.querySelectorAll('[data-r]').forEach(el=>el.oninput=e=>{
    const k=e.target.dataset.r;v[k]=k==='descrizione'?e.target.value:S.num(e.target.value);
-   tr.querySelector('.row-total').textContent=S.euro(S.num(v.quantita)*S.num(v.prezzoUnitario));
+   updatePricingRow(tr,v);
    changed();renderTotals()
   });
   tr.querySelector('[data-del]').onclick=()=>{
