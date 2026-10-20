@@ -30,7 +30,8 @@ S.commercialRoundUp=value=>{
 S.pricingRowBreakdown=(p,v)=>{
   const base=S.round(S.num(v.quantita)*S.num(v.prezzoUnitario));
   const lab=S.round(base*S.num(p.preventivo.manodoperaPct)/100);
-  const planner=S.round(base*S.num(p.preventivo.weddingPlannerPct)/100);
+  const plannerBase=S.round(base+lab);
+  const planner=S.round(plannerBase*S.num(p.preventivo.weddingPlannerPct)/100);
   const calculatedTaxable=S.round(base+lab+planner);
   const calculatedVat=S.round(calculatedTaxable*S.num(p.preventivo.ivaPct)/100);
   const calculatedTotal=S.round(calculatedTaxable+calculatedVat);
