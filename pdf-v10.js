@@ -69,7 +69,7 @@ async function drawProposalImage(o,p,im,x,rowTop,maxW,maxH,f){
  }
  return bottom
 }
-const PROPOSAL_BOTTOM_MARGIN=48;
+const PROPOSAL_BOTTOM_MARGIN=43; // abbassa il blocco testo di ~5 pt (~6-7 px)
 const PROPOSAL_NOTE_GAP=20;
 const PROPOSAL_ROW_GAP=10;
 function proposalNoteMetrics(noteLines,lineH){
