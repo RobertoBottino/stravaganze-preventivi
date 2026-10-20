@@ -1,10 +1,16 @@
 /* Pricing reorder + copy-to-proposal — v43 */
-.pricing-desc-cell{
+.pricing-desc-cell{min-width:0}
+.pricing-desc-inner{
   display:flex;
   align-items:center;
   gap:8px;
+  width:100%;
+  min-width:0;
 }
-.pricing-desc-cell input{flex:1 1 auto}
+.pricing-desc-inner input{
+  flex:1 1 auto;
+  min-width:0;
+}
 .price-drag{
   flex:0 0 36px;
   width:36px;
@@ -148,11 +154,18 @@
 }
 @media(max-width:600px){
   .pricing-table td.pricing-desc-cell{
-    grid-template-columns:104px 40px minmax(0,1fr);
+    grid-template-columns:104px minmax(0,1fr);
   }
   .pricing-table td.pricing-desc-cell::before{grid-column:1}
-  .pricing-desc-cell .price-drag{grid-column:2}
-  .pricing-desc-cell input{grid-column:3}
+  .pricing-desc-inner{
+    grid-column:2;
+    display:grid;
+    grid-template-columns:40px minmax(0,1fr);
+    gap:8px;
+    width:100%;
+  }
+  .pricing-desc-inner .price-drag{grid-column:1}
+  .pricing-desc-inner input{grid-column:2}
   .price-copy-field .price-copy-head{
     align-items:flex-start;
     flex-direction:column;
