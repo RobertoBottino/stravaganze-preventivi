@@ -82,53 +82,119 @@ function imageRowsForCount(n){
  return rows
 }
 function targetImageBox(chunkLength,rowIndex,rowCount,availableW,availableH,captionH){
- const twoColW=(availableW-14)/2;
- // Usa più pagina con poche immagini, ma rispetta SEMPRE il crop/proporzioni salvate dall'utente.
+ const gap=14;
+ const twoColW=(availableW-gap)/2;
+
+ // 1 immagine: molto più grande e centrale, sempre senza recrop.
  if(chunkLength===1){
-  return{w:Math.min(530,availableW),h:Math.min(430,Math.max(320,availableH-captionH-4))}
+  return{
+   w:Math.min(560,availableW),
+   h:Math.min(430,Math.max(320,availableH-captionH-8))
+  }
  }
+
+ // 2 immagini: grandi, una sotto l'altra, ben distribuite.
  if(chunkLength===2){
-  const each=Math.max(220,(availableH-(captionH*2)-18)/2);
-  return{w:Math.min(515,availableW),h:Math.min(285,each)}
+  const eachH=Math.max(220,(availableH-(captionH*2)-20)/2);
+  return{
+   w:Math.min(520,availableW),
+   h:Math.min(280,eachH)
+  }
  }
+
+ // 3 immagini: due sopra ampie, una sotto più grande e centrale.
  if(chunkLength===3&&rowIndex===0){
-  return{w:twoColW,h:Math.min(220,Math.max(182,availableH*.40-captionH))}
+  return{
+   w:twoColW,
+   h:Math.min(220,Math.max(185,availableH*.38-captionH))
+  }
  }
  if(chunkLength===3&&rowIndex===1){
-  return{w:Math.min(490,availableW),h:Math.min(270,Math.max(205,availableH*.49-captionH))}
+  return{
+   w:Math.min(500,availableW),
+   h:Math.min(270,Math.max(210,availableH*.46-captionH))
+  }
  }
+
+ // 4 immagini: griglia 2x2 più ampia.
  if(chunkLength===4){
-  return{w:twoColW,h:Math.min(210,Math.max(158,(availableH-captionH-18)/2))}
+  return{
+   w:twoColW,
+   h:Math.min(215,Math.max(160,(availableH-captionH-18)/2))
+  }
  }
- return{w:twoColW,h:Math.min(180,Math.max(120,(availableH-captionH-(rowCount-1)*18)/Math.max(1,rowCount)))}
+
+ return{
+  w:twoColW,
+  h:Math.min(180,Math.max(120,(availableH-captionH-(rowCount-1)*18)/Math.max(1,rowCount)))
+ }
 }
 async function drawAdaptiveProposalImages(o,p,chunk,currentY,bottomY,f){
  if(!chunk.length)return currentY;
- const margin=25,availableW=W-margin*2,rows=imageRowsForCount(chunk.length);
+
+ const margin=24;
+ const gap=14;
+ const availableW=W-margin*2;
+ const rows=imageRowsForCount(chunk.length);
  const totalAvailable=Math.max(200,currentY-bottomY);
  let cursor=currentY;
+
  for(let rowIndex=0;rowIndex<rows.length;rowIndex++){
-  const ids=rows[rowIndex],rowItems=ids.map(i=>chunk[i]),single=ids.length===1;
+  const ids=rows[rowIndex];
+  const rowItems=ids.map(i=>chunk[i]);
+  const single=ids.length===1;
+
   const remainingRows=rows.length-rowIndex;
   const remainingHeight=Math.max(155,cursor-bottomY);
   const rowShare=remainingHeight/remainingRows;
+
   const probeW=single
-   ?(chunk.length===1?Math.min(530,availableW):chunk.length===3?Math.min(490,availableW):Math.min(515,availableW))
-   :(availableW-14)/2;
+   ?(chunk.length===1
+     ?Math.min(560,availableW)
+     :chunk.length===3
+      ?Math.min(500,availableW)
+      :Math.min(520,availableW))
+   :(availableW-gap)/2;
+
   const captionH=Math.max(0,...rowItems.map(im=>captionLayout(f,im,probeW).height));
-  const box=targetImageBox(chunk.length,rowIndex,rows.length,availableW,totalAvailable,captionH);
-  const boxW=single?box.w:Math.min(box.w,(availableW-14)/2);
-  const minH=chunk.length<=3?165:112;
-  const boxH=Math.min(box.h,Math.max(minH,rowShare-captionH-(chunk.length<=3?5:10)));
+
+  const box=targetImageBox(
+   chunk.length,
+   rowIndex,
+   rows.length,
+   availableW,
+   totalAvailable,
+   captionH
+  );
+
+  const boxW=single?box.w:Math.min(box.w,(availableW-gap)/2);
+  const minH=chunk.length<=3?170:115;
+  const boxH=Math.min(
+   box.h,
+   Math.max(minH,rowShare-captionH-(chunk.length<=3?6:10))
+  );
+
   let rowBottom=Infinity;
+
   for(let col=0;col<rowItems.length;col++){
-   const x=single?(W-boxW)/2:margin+col*(boxW+14);
-   const bottom=await drawProposalImage(o,p,rowItems[col],x,cursor,boxW,boxH,f);
+   const x=single
+    ?(W-boxW)/2
+    :margin+col*(boxW+gap);
+
+   const bottom=await drawProposalImage(
+    o,p,rowItems[col],x,cursor,boxW,boxH,f
+   );
+
    rowBottom=Math.min(rowBottom,bottom)
   }
-  const rowGap=chunk.length<=2?14:rowIndex===rows.length-1?13:15;
+
+  const rowGap=
+   chunk.length<=2?14:
+   rowIndex===rows.length-1?13:15;
+
   cursor=rowBottom-rowGap
  }
+
  return cursor
 }
 async function proposal(o,m,f,b){
