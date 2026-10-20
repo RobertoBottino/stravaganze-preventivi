@@ -43,52 +43,18 @@ function captionLayout(f,im,maxW){
  const fit=fittedLines(f,caption,11.2,9.8,maxW,7),lineH=fit.size*1.34;
  return{caption,size:fit.size,lines:fit.lines,lineH,height:17+fit.lines.length*lineH};
 }
-const proposalCoverCache=new Map();
-async function coverProposalImageDataUrl(src,targetW,targetH){
- const ratio=Math.max(.35,Math.min(3,targetW/Math.max(1,targetH)));
- const key=(src?.length||0)+'|'+String(src||'').slice(-48)+'|'+Math.round(ratio*1000)+'|'+Math.round(targetW)+'x'+Math.round(targetH);
- if(proposalCoverCache.has(key))return proposalCoverCache.get(key);
- const promise=(async()=>{
-  const img=await new Promise((ok,ko)=>{const el=new Image();el.onload=()=>ok(el);el.onerror=()=>ko(new Error('Immagine proposta non leggibile'));el.src=src});
-  const outW=Math.max(720,Math.min(1500,Math.round(targetW*2.45))),outH=Math.max(420,Math.min(1300,Math.round(outW/ratio)));
-  const sourceRatio=img.naturalWidth/img.naturalHeight;
-  let sx=0,sy=0,sw=img.naturalWidth,sh=img.naturalHeight;
-  if(sourceRatio>ratio){
-   sw=img.naturalHeight*ratio;
-   sx=(img.naturalWidth-sw)/2
-  }else{
-   sh=img.naturalWidth/ratio;
-   sy=(img.naturalHeight-sh)/2
-  }
-  const canvas=document.createElement('canvas');canvas.width=outW;canvas.height=outH;
-  const ctx=canvas.getContext('2d',{alpha:false});
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,outW,outH);
-  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-  ctx.drawImage(img,sx,sy,sw,sh,0,0,outW,outH);
-  const out=canvas.toDataURL('image/jpeg',.9);
-  canvas.width=1;canvas.height=1;
-  return out
- })();
- proposalCoverCache.set(key,promise);
- try{return await promise}catch(e){proposalCoverCache.delete(key);throw e}
-}
-async function drawProposalImage(o,p,im,x,rowTop,maxW,maxH,f,mode='contain'){
+async function drawProposalImage(o,p,im,x,rowTop,maxW,maxH,f){
  let imageBottom=rowTop;
  try{
-  let src=im.dataUrl;
-  if(mode==='cover')src=await coverProposalImageDataUrl(src,maxW,maxH);
-  const j=await o.embedJpg(data(src));
-  let ww,hh;
-  if(mode==='cover'){ww=maxW;hh=maxH}
-  else{const sc=Math.min(maxW/j.width,maxH/j.height);ww=j.width*sc;hh=j.height*sc}
+  const j=await o.embedJpg(data(im.dataUrl));
+  const sc=Math.min(maxW/j.width,maxH/j.height);
+  const ww=j.width*sc,hh=j.height*sc;
   const imgX=x+(maxW-ww)/2,imgY=rowTop-hh;
-  p.drawImage(j,{x:imgX,y:imgY,width:ww,height:hh});imageBottom=imgY
+  p.drawImage(j,{x:imgX,y:imgY,width:ww,height:hh});
+  imageBottom=imgY
  }catch(e){
   console.warn('Immagine proposta non leggibile',e);
-  try{
-   const j=await o.embedJpg(data(im.dataUrl)),sc=Math.min(maxW/j.width,maxH/j.height),ww=j.width*sc,hh=j.height*sc,imgX=x+(maxW-ww)/2,imgY=rowTop-hh;
-   p.drawImage(j,{x:imgX,y:imgY,width:ww,height:hh});imageBottom=imgY
-  }catch{imageBottom=rowTop-maxH}
+  imageBottom=rowTop-maxH
  }
  const cap=captionLayout(f,im,maxW);
  let bottom=imageBottom;
@@ -104,8 +70,8 @@ async function drawProposalImage(o,p,im,x,rowTop,maxW,maxH,f,mode='contain'){
  return bottom
 }
 function proposalBottomReserve(noteLines,lineH){
- if(!noteLines)return 58;
- return Math.min(190,66+Math.min(noteLines,8)*lineH)
+ if(!noteLines)return 54;
+ return Math.min(182,62+Math.min(noteLines,8)*lineH)
 }
 function imageRowsForCount(n){
  if(n<=0)return[];
@@ -116,41 +82,51 @@ function imageRowsForCount(n){
  return rows
 }
 function targetImageBox(chunkLength,rowIndex,rowCount,availableW,availableH,captionH){
- const twoColW=(availableW-16)/2;
- // Editoriale: con poche foto la fotografia deve diventare protagonista della pagina.
- if(chunkLength===1)return{w:Math.min(515,availableW),h:Math.min(405,Math.max(300,availableH-captionH-8)),mode:'cover'};
- if(chunkLength===2){
-  const each=Math.max(205,(availableH-(captionH*2)-24)/2);
-  return{w:Math.min(475,availableW),h:Math.min(255,each),mode:'cover'}
+ const twoColW=(availableW-14)/2;
+ // Usa più pagina con poche immagini, ma rispetta SEMPRE il crop/proporzioni salvate dall'utente.
+ if(chunkLength===1){
+  return{w:Math.min(530,availableW),h:Math.min(430,Math.max(320,availableH-captionH-4))}
  }
- if(chunkLength===3&&rowIndex===0)return{w:twoColW,h:Math.min(205,Math.max(175,availableH*.39-captionH)),mode:'cover'};
- if(chunkLength===3&&rowIndex===1)return{w:Math.min(455,availableW),h:Math.min(235,Math.max(195,availableH*.47-captionH)),mode:'cover'};
- if(chunkLength===4)return{w:twoColW,h:Math.min(200,Math.max(150,(availableH-captionH-22)/2)),mode:'cover'};
- return{w:twoColW,h:Math.min(175,Math.max(118,(availableH-captionH-(rowCount-1)*20)/Math.max(1,rowCount))),mode:'contain'}
+ if(chunkLength===2){
+  const each=Math.max(220,(availableH-(captionH*2)-18)/2);
+  return{w:Math.min(515,availableW),h:Math.min(285,each)}
+ }
+ if(chunkLength===3&&rowIndex===0){
+  return{w:twoColW,h:Math.min(220,Math.max(182,availableH*.40-captionH))}
+ }
+ if(chunkLength===3&&rowIndex===1){
+  return{w:Math.min(490,availableW),h:Math.min(270,Math.max(205,availableH*.49-captionH))}
+ }
+ if(chunkLength===4){
+  return{w:twoColW,h:Math.min(210,Math.max(158,(availableH-captionH-18)/2))}
+ }
+ return{w:twoColW,h:Math.min(180,Math.max(120,(availableH-captionH-(rowCount-1)*18)/Math.max(1,rowCount)))}
 }
 async function drawAdaptiveProposalImages(o,p,chunk,currentY,bottomY,f){
  if(!chunk.length)return currentY;
- const margin=32,availableW=W-margin*2,rows=imageRowsForCount(chunk.length);
- const totalAvailable=Math.max(190,currentY-bottomY);
+ const margin=25,availableW=W-margin*2,rows=imageRowsForCount(chunk.length);
+ const totalAvailable=Math.max(200,currentY-bottomY);
  let cursor=currentY;
  for(let rowIndex=0;rowIndex<rows.length;rowIndex++){
   const ids=rows[rowIndex],rowItems=ids.map(i=>chunk[i]),single=ids.length===1;
   const remainingRows=rows.length-rowIndex;
-  const remainingHeight=Math.max(150,cursor-bottomY);
+  const remainingHeight=Math.max(155,cursor-bottomY);
   const rowShare=remainingHeight/remainingRows;
-  const probeW=single?(chunk.length===1?Math.min(515,availableW):chunk.length===3?Math.min(455,availableW):Math.min(475,availableW)):(availableW-16)/2;
+  const probeW=single
+   ?(chunk.length===1?Math.min(530,availableW):chunk.length===3?Math.min(490,availableW):Math.min(515,availableW))
+   :(availableW-14)/2;
   const captionH=Math.max(0,...rowItems.map(im=>captionLayout(f,im,probeW).height));
   const box=targetImageBox(chunk.length,rowIndex,rows.length,availableW,totalAvailable,captionH);
-  const boxW=single?box.w:Math.min(box.w,(availableW-16)/2);
-  const minH=chunk.length<=3?155:110;
-  const boxH=Math.min(box.h,Math.max(minH,rowShare-captionH-(chunk.length<=3?8:12)));
+  const boxW=single?box.w:Math.min(box.w,(availableW-14)/2);
+  const minH=chunk.length<=3?165:112;
+  const boxH=Math.min(box.h,Math.max(minH,rowShare-captionH-(chunk.length<=3?5:10)));
   let rowBottom=Infinity;
   for(let col=0;col<rowItems.length;col++){
-   const x=single?(W-boxW)/2:margin+col*(boxW+16);
-   const bottom=await drawProposalImage(o,p,rowItems[col],x,cursor,boxW,boxH,f,box.mode||'contain');
+   const x=single?(W-boxW)/2:margin+col*(boxW+14);
+   const bottom=await drawProposalImage(o,p,rowItems[col],x,cursor,boxW,boxH,f);
    rowBottom=Math.min(rowBottom,bottom)
   }
-  const rowGap=chunk.length<=2?18:rowIndex===rows.length-1?16:18;
+  const rowGap=chunk.length<=2?14:rowIndex===rows.length-1?13:15;
   cursor=rowBottom-rowGap
  }
  return cursor
@@ -163,24 +139,28 @@ async function proposal(o,m,f,b){
  const chunks=splitChunks(images,firstCap);let notePos=0;
  for(let pageIndex=0;pageIndex<chunks.length;pageIndex++){
   const p=page(o),chunk=chunks[pageIndex],introPage=pageIndex===0&&intro,isLastChunk=pageIndex===chunks.length-1;
-  center(p,(m.sezione||'LA NOSTRA PROPOSTA PER VOI').toUpperCase(),H-35,13,b);if(m.titolo)center(p,m.titolo.toUpperCase(),750,15,b);
-  let currentY=714;
+  center(p,(m.sezione||'LA NOSTRA PROPOSTA PER VOI').toUpperCase(),H-35,13,b);
+  if(m.titolo)center(p,m.titolo.toUpperCase(),750,15,b);
+  let currentY=716;
   if(introPage){
-   currentY=720;
+   currentY=722;
    for(const ln of il.lines){
-    if(ln){const tw=f.widthOfTextAtSize(ln,il.size);p.drawText(ln,{x:(W-tw)/2,y:currentY,size:il.size,font:f,color:dark})}
+    if(ln){
+     const tw=f.widthOfTextAtSize(ln,il.size);
+     p.drawText(ln,{x:(W-tw)/2,y:currentY,size:il.size,font:f,color:dark})
+    }
     currentY-=il.lineH
    }
-   currentY-=17
+   currentY-=14
   }
 
-  const noteReserve=isLastChunk?proposalBottomReserve(nl.lines.length,nl.lineH):54;
-  const bottomY=Math.max(64,noteReserve);
+  const noteReserve=isLastChunk?proposalBottomReserve(nl.lines.length,nl.lineH):50;
+  const bottomY=Math.max(60,noteReserve);
   if(chunk.length)currentY=await drawAdaptiveProposalImages(o,p,chunk,currentY,bottomY,f);
 
   if(isLastChunk&&notePos<nl.lines.length){
-   const startY=Math.min(currentY-3,images.length?currentY-3:Math.max(690,currentY));
-   const r=drawCenteredBlock(p,nl.lines.slice(notePos),startY,nl.size,f,dark,nl.lineH,58);
+   const startY=Math.min(currentY-2,images.length?currentY-2:Math.max(690,currentY));
+   const r=drawCenteredBlock(p,nl.lines.slice(notePos),startY,nl.size,f,dark,nl.lineH,56);
    notePos+=r.used
   }
  }
@@ -188,7 +168,7 @@ async function proposal(o,m,f,b){
   const p=page(o);
   center(p,(m.sezione||'LA NOSTRA PROPOSTA PER VOI').toUpperCase(),H-35,13,b);
   if(m.titolo)center(p,m.titolo.toUpperCase(),750,15,b);
-  const r=drawCenteredBlock(p,nl.lines.slice(notePos),705,nl.size,f,dark,nl.lineH,62);
+  const r=drawCenteredBlock(p,nl.lines.slice(notePos),705,nl.size,f,dark,nl.lineH,60);
   if(!r.used)break;
   notePos+=r.used
  }
