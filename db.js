@@ -23,7 +23,7 @@ S.all=async store=>{const db=await S.openDb();return new Promise((ok,ko)=>{const
 S.commercialRoundUp=value=>{
   const n=S.round(value);
   if(n<=0)return 0;
-  const step=n<100?5:n<1000?10:50;
+  const step=n<100?1:n<1000?5:10;
   return S.round(Math.ceil((n-1e-9)/step)*step);
 };
 
