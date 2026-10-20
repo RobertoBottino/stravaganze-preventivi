@@ -225,18 +225,17 @@ async function pricing(o,p,t,f,b){
   if(subtitle)center(g,subtitle,750,11,b,sage);
   y=735;
  };
- openPage();
- const k=1+(S.num(p.preventivo.manodoperaPct)+S.num(p.preventivo.weddingPlannerPct))/100;
+ openPage('IMPORTI DELLE VOCI IVA INCLUSA');
  for(const v of p.preventivo.voci||[]){
-  const q=S.num(v.quantita),u=S.round(S.num(v.prezzoUnitario)*k),r=S.round(q*S.num(v.prezzoUnitario)*k);
-  const row=(v.descrizione||'Voce')+' · '+(v.quantita||0)+' × '+S.euro(u)+' = '+S.euro(r);
+  const q=S.num(v.quantita),r=S.pricingRowBreakdown(p,v),qty=q.toLocaleString('it-IT',{maximumFractionDigits:2});
+  const row=(v.descrizione||'Voce')+(q===1?'':' · q.tà '+qty)+' · '+S.euro(r.total);
   const need=Math.max(1,wrap(f,row,12,W-110).length)*17.5+8;
-  if(y-need<205)openPage('CONTINUA');
+  if(y-need<205)openPage('CONTINUA · IVA INCLUSA');
   y=txt(g,row,55,y,12,f,dark,W-110,17.5);
  }
  if(y<220)openPage('RIEPILOGO');
  y-=12;g.drawLine({start:{x:55,y},end:{x:W-55,y},thickness:1,color:rgb(.82,.82,.78)});y-=26;
- const summary=[['Subtotale',t.taxable]];if(S.num(p.preventivo.ivaPct)>0)summary.push(['IVA',t.vat]);
+ const summary=[['Imponibile',t.taxable]];if(S.num(p.preventivo.ivaPct)>0)summary.push(['IVA',t.vat]);
  for(const z of summary){g.drawText(z[0],{x:55,y,size:11.5,font:f,color:dark});g.drawText(S.euro(z[1]),{x:400,y,size:11.5,font:b,color:dark});y-=21}
  if(t.hasOverride){
   const oldLabel='TOTALE CALCOLATO',oldValue=S.euro(t.rawTotal),oldY=y-2,oldSize=13,oldColor=rgb(.45,.48,.42);
