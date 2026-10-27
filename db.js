@@ -32,15 +32,20 @@ S.pricingRowBreakdown=(p,v)=>{
   const lab=S.round(base*S.num(p.preventivo.manodoperaPct)/100);
   const plannerBase=S.round(base+lab);
   const planner=S.round(plannerBase*S.num(p.preventivo.weddingPlannerPct)/100);
+
+  // Calcolo interno esatto, mostrato nell'app.
   const calculatedTaxable=S.round(base+lab+planner);
   const calculatedVat=S.round(calculatedTaxable*S.num(p.preventivo.ivaPct)/100);
   const calculatedTotal=S.round(calculatedTaxable+calculatedVat);
-  const total=S.commercialRoundUp(calculatedTotal);
-  const vatRate=S.num(p.preventivo.ivaPct);
-  const vat=vatRate>0?S.round(total*vatRate/(100+vatRate)):0;
-  const taxable=S.round(total-vat);
-  const roundingGross=S.round(total-calculatedTotal);
+
+  // Prezzo commerciale mostrato al cliente: arrotondiamo SOLO il netto IVA.
+  // L'IVA viene poi calcolata sul netto arrotondato.
+  const taxable=S.commercialRoundUp(calculatedTaxable);
+  const vat=S.round(taxable*S.num(p.preventivo.ivaPct)/100);
+  const total=S.round(taxable+vat);
+
   const roundingNet=S.round(taxable-calculatedTaxable);
+  const roundingGross=S.round(total-calculatedTotal);
   return{base,lab,planner,calculatedTaxable,calculatedVat,calculatedTotal,taxable,vat,total,roundingGross,roundingNet};
 };
 
