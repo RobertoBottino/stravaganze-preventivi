@@ -129,11 +129,8 @@ function updatePricingRow(tr,v){
  if(base)base.textContent=S.euro(r.base);
  if(labor)labor.textContent=S.euro(r.lab);
  if(planner)planner.textContent=S.euro(r.planner);
- if(vat)vat.textContent=S.euro(r.vat);
- if(total){
-  const roundedNote=r.total!==r.calculatedTotal?`<small class="commercial-rounding">arrotondato da ${S.euro(r.calculatedTotal)}</small>`:'';
-  total.innerHTML=`<strong>${S.euro(r.total)}</strong>${roundedNote}`
- }
+ if(vat)vat.textContent=S.euro(r.calculatedVat);
+ if(total)total.innerHTML=`<strong>${S.euro(r.calculatedTotal)}</strong>`
 }
 function renderPricing(){
  const body=$('pricingRows');
@@ -146,8 +143,8 @@ function renderPricing(){
    <td class="row-money row-base" data-price-base>${S.euro(r.base)}</td>
    <td class="row-money row-labor" data-price-labor>${S.euro(r.lab)}</td>
    <td class="row-money row-planner" data-price-planner>${S.euro(r.planner)}</td>
-   <td class="row-money row-vat" data-price-vat>${S.euro(r.vat)}</td>
-   <td class="row-money row-grand-total" data-price-total><strong>${S.euro(r.total)}</strong>${r.total!==r.calculatedTotal?`<small class="commercial-rounding">arrotondato da ${S.euro(r.calculatedTotal)}</small>`:''}</td>
+   <td class="row-money row-vat" data-price-vat>${S.euro(r.calculatedVat)}</td>
+   <td class="row-money row-grand-total" data-price-total><strong>${S.euro(r.calculatedTotal)}</strong></td>
    <td class="pricing-actions"><button class="danger" data-del>×</button></td>
   </tr>`
  }).join('');
