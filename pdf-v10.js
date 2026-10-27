@@ -225,12 +225,14 @@ async function pricing(o,p,t,f,b){
   if(subtitle)center(g,subtitle,750,11,b,sage);
   y=735;
  };
- openPage('IMPORTI DELLE VOCI IVA INCLUSA');
+ openPage('IMPORTI DELLE VOCI IVA ESCLUSA');
  for(const v of p.preventivo.voci||[]){
   const q=S.num(v.quantita),r=S.pricingRowBreakdown(p,v),qty=q.toLocaleString('it-IT',{maximumFractionDigits:2});
-  const row=(v.descrizione||'Voce')+(q===1?'':' · q.tà '+qty)+' · '+S.euro(r.total);
+  // Nel PDF cliente ogni voce mostra il prezzo effettivo al netto IVA:
+  // manodopera e Wedding Planner sono già comprese; l'IVA viene esposta solo nel riepilogo.
+  const row=(v.descrizione||'Voce')+(q===1?'':' · q.tà '+qty)+' · '+S.euro(r.taxable);
   const need=Math.max(1,wrap(f,row,12,W-110).length)*17.5+8;
-  if(y-need<205)openPage('CONTINUA · IVA INCLUSA');
+  if(y-need<205)openPage('CONTINUA · IVA ESCLUSA');
   y=txt(g,row,55,y,12,f,dark,W-110,17.5);
  }
  if(y<220)openPage('RIEPILOGO');
