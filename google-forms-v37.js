@@ -11,6 +11,8 @@ const CONFIG={
   }
 };
 const AUTH_SESSION_KEY='sf-google-auth-session-v1';
+const AUTH_KNOWN_KEY='sf-google-auth-known-v1';
+let renewTimer=null;
 const state={
   accessToken:'',
   tokenExpiresAt:0,
@@ -28,17 +30,17 @@ async function init(){
   restoreAuthSession();
   wire();
   renderAuthState();
-  setTimeout(()=>{
-    if(!hasToken()&&!$('googleAuthModal')?.dataset.dismissed)showAuthModal()
-  },450);
-  try{await ensureGoogleClient()}catch(e){console.warn('Google Identity Services non disponibile',e);renderAuthState()}
+  try{
+    await ensureGoogleClient();
+    if(hasToken())scheduleTokenRenewal()
+  }catch(e){console.warn('Google Identity Services non disponibile',e);renderAuthState()}
 }
 
 function wire(){
   $('googleConnectBtn')?.addEventListener('click',async()=>{try{await connectGoogle(true);hideAuthModal();await openQuestionnaires()}catch(e){showGoogleError(e)}});
   $('googleSkipBtn')?.addEventListener('click',()=>{if($('googleAuthModal'))$('googleAuthModal').dataset.dismissed='1';hideAuthModal()});
   $('googleReconnectBtn')?.addEventListener('click',async()=>{try{await connectGoogle(true);await refreshCurrent(true)}catch(e){showPanelError(e)}});
-  $('googleChangeAccountBtn')?.addEventListener('click',async()=>{clearToken();try{await connectGoogle(true);await refreshCurrent(true)}catch(e){showPanelError(e)}});
+  $('googleChangeAccountBtn')?.addEventListener('click',async()=>{clearToken(true);try{await connectGoogle(true);await refreshCurrent(true)}catch(e){showPanelError(e)}});
   $('questionnaireClose')?.addEventListener('click',closeQuestionnaires);
   $('questionnaireDrawer')?.addEventListener('click',e=>{if(e.target===$('questionnaireDrawer'))closeQuestionnaires()});
   $('questionnaireSearch')?.addEventListener('input',renderList);
@@ -46,7 +48,8 @@ function wire(){
   $('questionnaireTabs')?.querySelectorAll('[data-q-lang]').forEach(b=>b.addEventListener('click',()=>switchLang(b.dataset.qLang)));
   $('questionnaireDetailClose')?.addEventListener('click',closeDetail);
   $('questionnaireDetailModal')?.addEventListener('click',e=>{if(e.target===$('questionnaireDetailModal'))closeDetail()});
-  $('questionnairePdfBtn')?.addEventListener('click',exportCurrentPdf);
+  $('questionnaireDownloadBtn')?.addEventListener('click',()=>exportCurrentPdf('download'));
+  $('questionnaireShareBtn')?.addEventListener('click',()=>exportCurrentPdf('share'));
   $('navQuestionnaires')?.addEventListener('click',()=>{$('closeMenu')?.click();setTimeout(openQuestionnaires,210)});
   document.addEventListener('keydown',e=>{
     if(e.key!=='Escape')return;
@@ -85,8 +88,23 @@ function persistAuthSession(){
     sessionStorage.setItem(AUTH_SESSION_KEY,JSON.stringify({
       accessToken:state.accessToken,
       tokenExpiresAt:state.tokenExpiresAt
-    }))
+    }));
+    localStorage.setItem(AUTH_KNOWN_KEY,'1')
   }catch(e){console.warn('Impossibile conservare la sessione Google nel browser',e)}
+}
+function scheduleTokenRenewal(){
+  if(renewTimer){clearTimeout(renewTimer);renewTimer=null}
+  if(!hasToken())return;
+  const delay=Math.max(15000,state.tokenExpiresAt-Date.now()-5*60*1000);
+  renewTimer=setTimeout(async()=>{
+    renewTimer=null;
+    if(!navigator.onLine||document.visibilityState==='hidden'){scheduleTokenRenewal();return}
+    try{await connectGoogle(false)}
+    catch(e){
+      console.warn('Rinnovo automatico Google non riuscito',e);
+      if(hasToken())setTimeout(scheduleTokenRenewal,60000)
+    }
+  },delay)
 }
 function restoreAuthSession(){
   try{
@@ -113,6 +131,7 @@ function tokenCallback(resp){
     state.accessToken=resp.access_token;
     state.tokenExpiresAt=Date.now()+Math.max(60,Number(resp.expires_in||3600))*1000;
     persistAuthSession();
+    scheduleTokenRenewal();
     renderAuthState();
     window.dispatchEvent(new CustomEvent('sf-google-auth',{detail:{connected:true,expiresAt:state.tokenExpiresAt}}));
     pending?.resolve(resp);
@@ -135,9 +154,13 @@ async function connectGoogle(selectAccount){
     catch(e){state.pendingAuth=null;reject(e)}
   });
 }
-function clearToken(){
+function clearToken(forget=false){
   state.accessToken='';state.tokenExpiresAt=0;
-  try{sessionStorage.removeItem(AUTH_SESSION_KEY)}catch{}
+  if(renewTimer){clearTimeout(renewTimer);renewTimer=null}
+  try{
+    sessionStorage.removeItem(AUTH_SESSION_KEY);
+    if(forget)localStorage.removeItem(AUTH_KNOWN_KEY)
+  }catch{}
   renderAuthState();
   window.dispatchEvent(new CustomEvent('sf-google-auth',{detail:{connected:false}}));
 }
@@ -166,6 +189,9 @@ async function openQuestionnaires(){
   document.body.classList.add('sf-questionnaires-open');
   setTimeout(()=>$('questionnaireSearch')?.focus(),60);
   renderAuthState();
+  if(!hasToken()&&localStorage.getItem(AUTH_KNOWN_KEY)==='1'){
+    try{await connectGoogle(false)}catch(e){console.warn('Riconnessione Google non riuscita',e)}
+  }
   if(!hasToken()){
     setPanelStatus('Collega Google per leggere le risposte dei questionari.','auth');
     renderList();
@@ -245,9 +271,19 @@ async function loadFormData(lang){
   const records=responses.map(r=>buildRecord(r,schema,cfg)).sort((a,b)=>String(b.submittedAt).localeCompare(String(a.submittedAt)));
   return{lang,cfg,form,schema,records,loadedAt:new Date().toISOString()};
 }
-async function apiGet(url){
-  if(!hasToken()){const e=new Error('Sessione Google scaduta.');e.status=401;throw e}
+async function apiGet(url,retried=false){
+  if(!hasToken()){
+    try{await connectGoogle(false)}catch{}
+    if(!hasToken()){const e=new Error('Sessione Google scaduta.');e.status=401;throw e}
+  }
   const res=await fetch(url,{headers:{Authorization:'Bearer '+state.accessToken,Accept:'application/json'},cache:'no-store'});
+  if(res.status===401&&!retried){
+    clearToken(false);
+    try{
+      await connectGoogle(false);
+      if(hasToken())return apiGet(url,true)
+    }catch{}
+  }
   if(!res.ok){
     let body={};try{body=await res.json()}catch{}
     const e=new Error(body?.error?.message||('Google API: HTTP '+res.status));e.status=res.status;e.body=body;throw e
@@ -375,16 +411,25 @@ function closeDetail(){
   state.currentRecord=null;
 }
 
-async function exportCurrentPdf(){
+async function exportCurrentPdf(mode='download'){
   if(!state.currentRecord)return;
-  const btn=$('questionnairePdfBtn'),old=btn.textContent;btn.disabled=true;btn.textContent='Creo il PDF…';
+  const downloadBtn=$('questionnaireDownloadBtn'),shareBtn=$('questionnaireShareBtn');
+  const btn=mode==='share'?shareBtn:downloadBtn,old=btn?.textContent||'';
+  if(downloadBtn)downloadBtn.disabled=true;if(shareBtn)shareBtn.disabled=true;
+  if(btn)btn.textContent='Creo il PDF…';
   try{
     const bytes=await makeQuestionnairePdf(state.currentRecord.record,state.currentRecord.data);
     const safe=S.fileName?S.fileName(state.currentRecord.record.name||'Questionario'):(state.currentRecord.record.name||'Questionario').replace(/[^\w-]+/g,'_');
     const name='Questionario_'+safe+'_'+state.currentRecord.data.cfg.label+'.pdf';
-    if(S.sharePdf)await S.sharePdf(bytes,name);else downloadBytes(bytes,name);
-  }catch(e){alert('Impossibile creare il PDF: '+(e.message||e))}
-  finally{btn.disabled=false;btn.textContent=old}
+    if(mode==='share'){
+      if(S.sharePdf)await S.sharePdf(bytes,name);else downloadBytes(bytes,name)
+    }else downloadBytes(bytes,name)
+  }catch(e){
+    if(e?.name!=='AbortError')alert('Impossibile creare il PDF: '+(e.message||e))
+  }finally{
+    if(downloadBtn)downloadBtn.disabled=false;if(shareBtn)shareBtn.disabled=false;
+    if(btn)btn.textContent=old
+  }
 }
 async function makeQuestionnairePdf(record,data){
   if(!window.PDFLib)throw new Error('Motore PDF non disponibile.');
