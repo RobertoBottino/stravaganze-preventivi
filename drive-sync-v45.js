@@ -48,7 +48,7 @@ async function ensureConnectedAndSync(interactive){
   try{
     if(!S.GoogleAuth?.hasToken?.()){
       setStatus('auth');
-      await S.GoogleAuth?.connect?.(true);
+      await S.GoogleAuth?.connect?.(false);
     }
     await serialized(()=>syncAll({interactive:Boolean(interactive),reason:'manual'}))
   }catch(e){showError(e,interactive)}
@@ -86,13 +86,22 @@ function serialized(fn){
   return run
 }
 
-async function driveFetch(url,opts={}){
+async function driveFetch(url,opts={},retried=false){
+  if(!S.GoogleAuth?.hasToken?.()){
+    try{await S.GoogleAuth?.connect?.(false)}catch{}
+  }
   const headers=new Headers(opts.headers||{});
   headers.set('Authorization','Bearer '+token());
   if(!headers.has('Accept'))headers.set('Accept','application/json');
   const res=await fetch(url,{...opts,headers,cache:'no-store'});
+  if(res.status===401&&!retried){
+    S.GoogleAuth?.clear?.(false);
+    try{
+      await S.GoogleAuth?.connect?.(false);
+      if(S.GoogleAuth?.hasToken?.())return driveFetch(url,opts,true)
+    }catch{}
+  }
   if(res.status===401){
-    S.GoogleAuth?.clear?.();
     const e=new Error('Sessione Google scaduta. Ricollega l’account.');e.status=401;throw e
   }
   if(!res.ok){
