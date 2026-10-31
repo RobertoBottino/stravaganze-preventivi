@@ -225,7 +225,7 @@ function enablePricingDrag(body){
 function proposalPricingLine(v){
  const r=pricingRowBreakdown(v),q=S.num(v.quantita),qty=q.toLocaleString('it-IT',{maximumFractionDigits:2});
  const desc=String(v.descrizione||'Voce').trim()||'Voce';
- return q===1?`${desc} · ${S.euro(r.total)}`:`${desc} · q.tà ${qty} · ${S.euro(r.total)}`
+ return q===1?`${desc} · ${S.euro(r.taxable)}`:`${desc} · q.tà ${qty} · ${S.euro(r.taxable)}`
 }
 function openPricingCopyModal(pageId){
  pricingCopyTargetId=pageId;
@@ -234,7 +234,7 @@ function openPricingCopyModal(pageId){
  const rows=state.preventivo.voci||[];
  $('pricingCopyList').innerHTML=rows.length?rows.map(v=>{
   const q=S.num(v.quantita),r=pricingRowBreakdown(v);
-  return `<label class="pricing-copy-item"><input type="checkbox" value="${S.attr(v.id)}"><span class="pricing-copy-item-main"><b>${S.esc(v.descrizione||'Voce senza descrizione')}</b><small>Q.tà ${q.toLocaleString('it-IT',{maximumFractionDigits:2})} · totale voce IVA inclusa</small></span><span class="pricing-copy-item-price">${S.euro(r.total)}</span></label>`
+  return `<label class="pricing-copy-item"><input type="checkbox" value="${S.attr(v.id)}"><span class="pricing-copy-item-main"><b>${S.esc(v.descrizione||'Voce senza descrizione')}</b><small>Q.tà ${q.toLocaleString('it-IT',{maximumFractionDigits:2})} · prezzo cliente IVA esclusa</small></span><span class="pricing-copy-item-price">${S.euro(r.taxable)}</span></label>`
  }).join(''):'<div class="pricing-copy-empty">Non ci sono ancora voci nel preventivo.</div>';
  const append=document.querySelector('input[name="pricingCopyMode"][value="append"]');if(append)append.checked=true;
  $('copyPricingModal').hidden=false;
