@@ -123,28 +123,26 @@ function renderProposals(){
 function moveImage(p,id,d){const i=p.immagini.findIndex(x=>x.id===id),j=i+d;if(i<0||j<0||j>=p.immagini.length)return;[p.immagini[i],p.immagini[j]]=[p.immagini[j],p.immagini[i]];changed();renderProposals()}
 function movePage(id,d){const i=state.pagine.findIndex(x=>x.id===id),j=i+d;if(i<0||j<0||j>=state.pagine.length)return;[state.pagine[i],state.pagine[j]]=[state.pagine[j],state.pagine[i]];changed();renderProposals()}
 function pricingRowBreakdown(v){return S.pricingRowBreakdown(state,v)}
+function pricingClientUnit(v,r){
+ const q=S.num(v.quantita);
+ return q>0?S.round(r.taxable/q):0
+}
 function updatePricingRow(tr,v){
- const r=pricingRowBreakdown(v);
- const base=tr.querySelector('[data-price-base]'),labor=tr.querySelector('[data-price-labor]'),planner=tr.querySelector('[data-price-planner]'),vat=tr.querySelector('[data-price-vat]'),total=tr.querySelector('[data-price-total]');
- if(base)base.textContent=S.euro(r.base);
- if(labor)labor.textContent=S.euro(r.lab);
- if(planner)planner.textContent=S.euro(r.planner);
- if(vat)vat.textContent=S.euro(r.calculatedVat);
- if(total)total.innerHTML=`<strong>${S.euro(r.calculatedTotal)}</strong>`
+ const r=pricingRowBreakdown(v),clientUnit=pricingClientUnit(v,r);
+ const unit=tr.querySelector('[data-price-client-unit]'),total=tr.querySelector('[data-price-total]');
+ if(unit)unit.textContent=S.euro(clientUnit);
+ if(total)total.innerHTML=`<strong>${S.euro(r.taxable)}</strong>`
 }
 function renderPricing(){
  const body=$('pricingRows');
  body.innerHTML=state.preventivo.voci.map(v=>{
-  const r=pricingRowBreakdown(v);
+  const r=pricingRowBreakdown(v),clientUnit=pricingClientUnit(v,r);
   return `<tr data-id="${v.id}">
    <td class="pricing-desc-cell"><div class="pricing-desc-inner"><button type="button" class="price-drag" data-drag aria-label="Trascina per riordinare" title="Trascina per riordinare · frecce ↑ ↓ da tastiera">⋮⋮</button><input data-r="descrizione" value="${S.attr(v.descrizione)}" placeholder="es. Centrotavola"></div></td>
    <td class="pricing-qty"><input data-r="quantita" type="number" min="0" step="0.1" value="${v.quantita}"></td>
-   <td class="pricing-unit"><input data-r="prezzoUnitario" type="number" min="0" step="0.01" value="${v.prezzoUnitario}"></td>
-   <td class="row-money row-base" data-price-base>${S.euro(r.base)}</td>
-   <td class="row-money row-labor" data-price-labor>${S.euro(r.lab)}</td>
-   <td class="row-money row-planner" data-price-planner>${S.euro(r.planner)}</td>
-   <td class="row-money row-vat" data-price-vat>${S.euro(r.calculatedVat)}</td>
-   <td class="row-money row-grand-total" data-price-total><strong>${S.euro(r.calculatedTotal)}</strong></td>
+   <td class="pricing-unit"><input data-r="prezzoUnitario" type="number" min="0" step="0.01" value="${v.prezzoUnitario}" title="Prezzo base per singola unità"></td>
+   <td class="row-money row-client-unit" data-price-client-unit title="Manodopera e Wedding Planner comprese, IVA esclusa">${S.euro(clientUnit)}</td>
+   <td class="row-money row-grand-total" data-price-total title="Totale della voce mostrato al cliente nel PDF, IVA esclusa"><strong>${S.euro(r.taxable)}</strong></td>
    <td class="pricing-actions"><button class="danger" data-del>×</button></td>
   </tr>`
  }).join('');
@@ -291,11 +289,11 @@ function renderTotals(){
 
  const cells=[['Base',t.base,''],['Manodopera',t.lab,''],['Wedding planner',t.planner,'']];
  if(t.roundingNet>0)cells.push(['Arrotondamenti commerciali',t.roundingNet,'']);
- cells.push(['Imponibile',t.taxable,''],['IVA',t.vat,'']);
+ cells.push(['Incasso netto (IVA esclusa)',t.taxable,''],['IVA',t.vat,'']);
  if(t.hasOverride){
   cells.push(['Totale calcolato',t.rawTotal,'grand old-grand']);
   cells.push(['Totale finale',t.total,'grand final-grand']);
- }else cells.push(['Totale',t.rawTotal,'grand']);
+ }else cells.push(['Totale cliente',t.rawTotal,'grand']);
 
  if(t.hasDepositOverride){
   cells.push(['Caparra 30% calcolata',t.rawDeposit,'old-payment']);
